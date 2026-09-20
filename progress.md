@@ -23,7 +23,8 @@
   - *2026-09-20 15:02*: Implemented `get_source` supporting URL download with MD5 hashing cache and local upload resolution. Tested downloading via HTTP and cache reuse. Touched: `app/engine.py`.
 - [x] **2.2** `has_audio(path)` and `probe_duration(path)` using ffprobe.
   - *2026-09-20 15:03*: Implemented ffprobe-based `has_audio` and `probe_duration`. Tested with generated audio clip (detected audio=True, duration=3.0s) and silent clip (detected audio=False, duration=4.0s). Touched: `app/engine.py`.
-- [ ] **2.3** `build_intro(cfg, work_dir)`: produces `seg_intro.mp4`.
+- [x] **2.3** `build_intro(cfg, work_dir)`: produces `seg_intro.mp4`.
+  - *2026-09-20 15:03*: Implemented `build_intro` with font management (`font.ttf` copy), title text file handling to avoid escaping issues, configurable resolution/accent/bg, and 44.1kHz silent stereo audio. Tested producing `seg_intro.mp4` with exact 3.0s duration and audio stream. Touched: `app/engine.py`.
 - [ ] **2.4** `build_item(cfg, item, idx, work_dir)`: produces one item segment per section 4.
 - [ ] **2.5** `concat_segments(segments, work_dir)`: joins them with the concat demuxer.
 - [ ] **2.6** `add_bgm(joined, bgm, volume, output)`: mixes the looped music.

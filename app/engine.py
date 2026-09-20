@@ -119,3 +119,123 @@ def probe_duration(path: Path | str) -> float:
 
     return 0.0
 
+
+def prepare_font(cfg: dict, work_dir: Path, fonts_dir: Path, uploads_dir: Path) -> Path:
+    """
+    Ensures font.ttf exists in work_dir. Copies specified font or default.ttf.
+    """
+    work_dir = Path(work_dir)
+    dest_font = work_dir / "font.ttf"
+    if dest_font.exists():
+        return dest_font
+
+    font_id = cfg.get("font")
+    chosen_font_path: Path | None = None
+
+    if font_id:
+        custom_path = uploads_dir / str(font_id)
+        if custom_path.is_file():
+            chosen_font_path = custom_path
+        else:
+            matches = list(uploads_dir.glob(f"{font_id}.*"))
+            if matches:
+                chosen_font_path = matches[0]
+
+    if not chosen_font_path or not chosen_font_path.is_file():
+        default_font = fonts_dir / "default.ttf"
+        if default_font.is_file():
+            chosen_font_path = default_font
+        else:
+            # System font fallbacks
+            for fallback in [
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+            ]:
+                if Path(fallback).is_file():
+                    chosen_font_path = Path(fallback)
+                    break
+
+    if not chosen_font_path or not chosen_font_path.is_file():
+        raise FileNotFoundError("Could not locate a usable TTF font file")
+
+    import shutil
+    shutil.copyfile(chosen_font_path, dest_font)
+    return dest_font
+
+
+def build_intro(cfg: dict, work_dir: Path | str, base_data_dir: Path | str = "data") -> Path:
+    """
+    Produces seg_intro.mp4 in work_dir with background and centered title.
+    """
+    work_dir = Path(work_dir).resolve()
+    work_dir.mkdir(parents=True, exist_ok=True)
+    base_data_dir = Path(base_data_dir).resolve()
+    fonts_dir = base_data_dir / "fonts"
+    uploads_dir = base_data_dir / "uploads"
+    downloads_dir = base_data_dir / "downloads"
+
+    prepare_font(cfg, work_dir, fonts_dir, uploads_dir)
+
+    width = int(cfg.get("width", 1920))
+    height = int(cfg.get("height", 1080))
+    intro_seconds = float(cfg.get("intro_seconds", 3))
+    accent = str(cfg.get("accent", "yellow"))
+    bg_color = str(cfg.get("bg_color", "0x141414"))
+    title = str(cfg.get("title", "RANKING VIDEO"))
+
+    # Write title to text file to avoid escaping bugs
+    title_txt = work_dir / "intro_title.txt"
+    title_txt.write_text(title, encoding="utf-8")
+
+    out_file = work_dir / "seg_intro.mp4"
+    bg_image_id = cfg.get("bg_image")
+
+    font_size = max(24, int(min(width, height) / 14))
+    border_w = max(2, int(font_size / 20))
+
+    drawtext_filter = (
+        f"drawtext=fontfile=font.ttf:textfile=intro_title.txt:"
+        f"fontsize={font_size}:fontcolor={accent}:borderw={border_w}:bordercolor=black:"
+        f"x=(w-text_w)/2:y=(h-text_h)/2"
+    )
+
+    if bg_image_id:
+        bg_path = get_source(bg_image_id, downloads_dir, uploads_dir)
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-i", str(bg_path),
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-filter_complex",
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,{drawtext_filter}[v]",
+            "-map", "[v]",
+            "-map", "1:a",
+            "-t", str(intro_seconds),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            str(out_file),
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r=30",
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-filter_complex",
+            f"[0:v]{drawtext_filter}[v]",
+            "-map", "[v]",
+            "-map", "1:a",
+            "-t", str(intro_seconds),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            str(out_file),
+        ]
+
+    res = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"FFmpeg build_intro failed: {res.stderr.strip()}")
+
+    if not out_file.exists():
+        raise FileNotFoundError(f"build_intro did not produce {out_file}")
+
+    return out_file
+
+
