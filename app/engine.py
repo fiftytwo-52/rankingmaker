@@ -89,20 +89,37 @@ def get_source(
         # Download via yt-dlp
         output_template = str(downloads_dir / f"{url_hash}.%(ext)s")
         cmd = [
-            "yt-dlp",
-            "-f", "bv*[height<=1080]+ba/b",
+            sys.executable,
+            "-m",
+            "yt_dlp",
+            "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
             "--merge-output-format", "mp4",
             "-o", output_template,
             source_str,
         ]
         res = run_subprocess_with_cancel(cmd, cancel_flag=cancel_flag)
         if res.returncode != 0:
-            # Try python -m yt_dlp fallback if direct executable failed
-            fallback_cmd = [sys.executable, "-m", "yt_dlp", "-f", "bv*[height<=1080]+ba/b", "--merge-output-format", "mp4", "-o", output_template, source_str]
+            # Fallback to system yt-dlp
+            fallback_cmd = ["yt-dlp", "-f", "bv*[height<=1080]+ba/b/best", "--merge-output-format", "mp4", "-o", output_template, source_str]
             res2 = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
             if res2.returncode != 0:
-                clean_err = format_ffmpeg_error(res2.stderr or res.stderr)
-                raise RuntimeError(f"yt-dlp failed to download URL '{source_str}':\n{clean_err}")
+                # If both yt-dlp calls fail, check if it's a direct file download
+                direct_ext = Path(urllib.parse.urlparse(source_str).path).suffix.lower()
+                if direct_ext in [".mp4", ".mov", ".mkv", ".webm", ".avi", ".ts"]:
+                    try:
+                        direct_dest = downloads_dir / f"{url_hash}{direct_ext}"
+                        req = urllib.request.Request(
+                            source_str,
+                            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                        )
+                        with urllib.request.urlopen(req, timeout=30) as resp, open(direct_dest, "wb") as out_f:
+                            shutil.copyfileobj(resp, out_f)
+                    except Exception as e:
+                        clean_err = format_ffmpeg_error(res.stderr or res2.stderr)
+                        raise RuntimeError(f"Failed to download URL '{source_str}':\n{clean_err}\nDirect download error: {e}")
+                else:
+                    clean_err = format_ffmpeg_error(res.stderr or res2.stderr)
+                    raise RuntimeError(f"yt-dlp failed to download URL '{source_str}':\n{clean_err}")
 
         matches = [Path(p) for p in glob.glob(pattern) if not p.endswith(".part")]
         if not matches:
