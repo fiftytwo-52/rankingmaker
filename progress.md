@@ -87,7 +87,8 @@
 
 - [X] **7.1** End-to-end manual test with 5 items (mix of URLs and uploaded clips), a background image, and BGM. Record results in `progress.md`.
   - *2026-09-20 15:35*: Executed automated end-to-end test (`tests/test_e2e_5items.py`) exercising complete workflow: uploaded background image and BGM audio via `/api/upload`, uploaded 3 local video clips (including an audio-less clip), provided 2 live YouTube video URLs (`aqz-KE-bpKQ` and `jNQXAC9IVRw`), submitted job via `POST /api/jobs`, and polled progress through completion. Verified generated MP4 stream properties: duration = 21.02s (matching intro 3.0s + 3.5s + 3.5s + 3.5s + 3.5s + 4.0s), resolution = 1920x1080 h264, audio = 44.1kHz stereo AAC with mixed BGM and clip audio. Verified intermediate `work/` files were automatically cleaned up leaving only `output.mp4` and `job.json`. Touched: `tests/test_e2e_5items.py`, `app/engine.py`.
-- [ ] **7.2** Finalize `README.md` (install, run, use, troubleshooting) and `docs/APP_DOCUMENTATION.md`.
+- [X] **7.2** Finalize `README.md` (install, run, use, troubleshooting) and `docs/APP_DOCUMENTATION.md`.
+  - *2026-09-20 15:37*: Finalized `README.md` with complete installation steps, virtual environment activation, command reference, testing instructions, API reference table, and troubleshooting solutions. Updated `docs/APP_DOCUMENTATION.md` with ASCII architectural diagram, directory breakdown, schema definitions, all 8 API endpoints, comprehensive pipeline walkthrough, and customization guide. Touched: `README.md`, `docs/APP_DOCUMENTATION.md`.
 - [ ] **7.3** Final update of `memory.md`: current status = "functional version complete, ready for polish phase", plus a list of known issues.
 
 ## Later / polish ideas
