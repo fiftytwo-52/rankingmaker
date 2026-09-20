@@ -32,3 +32,7 @@ Thumbs.db
 
 # Test scratch output media
 tests/scratch_*/
+
+# Personal upload tracker — pushed once on 2026-09-20 (commit 6063395), kept local from here on.
+# Untracked with `git rm -r --cached Tracker`; re-cloning the repo will NOT restore this folder.
+Tracker/
