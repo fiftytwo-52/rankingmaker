@@ -3,6 +3,7 @@ import glob
 from pathlib import Path
 import subprocess
 import sys
+from typing import Any
 
 
 def get_source(source: str, downloads_dir: Path | str, uploads_dir: Path | str) -> Path:
@@ -487,6 +488,118 @@ def add_bgm(
         raise FileNotFoundError(f"add_bgm did not produce {output_path}")
 
     return output_path
+
+
+class JobCancelledException(Exception):
+    """Raised when a job is cancelled by the user or cancel flag."""
+    pass
+
+
+def is_cancelled(cancel_flag) -> bool:
+    if cancel_flag is None:
+        return False
+    if callable(cancel_flag):
+        return bool(cancel_flag())
+    if hasattr(cancel_flag, "is_set"):
+        return bool(cancel_flag.is_set())
+    return bool(cancel_flag)
+
+
+def render(
+    cfg: dict | Any,
+    job_dir: Path | str,
+    progress_callback=None,
+    cancel_flag=None,
+    base_data_dir: Path | str = "data",
+) -> Path:
+    """
+    Orchestrates the entire video rendering pipeline:
+    1. Sorts items in countdown order (highest rank first, #1 last).
+    2. Builds intro segment.
+    3. Builds each item segment.
+    4. Concat demuxes segments.
+    5. Mixes background music and writes output.mp4.
+    Checks cancel_flag between stages and updates progress_callback.
+    """
+    if hasattr(cfg, "model_dump"):
+        cfg_dict = cfg.model_dump()
+    elif hasattr(cfg, "dict"):
+        cfg_dict = cfg.dict()
+    else:
+        cfg_dict = dict(cfg)
+
+    def report(pct: int, msg: str):
+        if progress_callback:
+            progress_callback(pct, msg)
+
+    if is_cancelled(cancel_flag):
+        raise JobCancelledException("Job was cancelled before starting")
+
+    job_path = Path(job_dir).resolve()
+    job_path.mkdir(parents=True, exist_ok=True)
+    work_dir = job_path / "work"
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    base_data_dir = Path(base_data_dir).resolve()
+    downloads_dir = base_data_dir / "downloads"
+    uploads_dir = base_data_dir / "uploads"
+
+    report(5, "Preparing job assets...")
+
+    if is_cancelled(cancel_flag):
+        raise JobCancelledException("Job cancelled during asset preparation")
+
+    # Sort items in countdown order (descending by rank: 5, 4, 3, 2, 1)
+    raw_items = cfg_dict.get("items", [])
+    if not raw_items:
+        raise ValueError("Cannot render video with zero items")
+    sorted_items = sorted(raw_items, key=lambda x: int(x.get("rank", 0)), reverse=True)
+
+    # 1. Intro segment
+    report(10, "Building intro segment...")
+    intro_seg = build_intro(cfg_dict, work_dir, base_data_dir=base_data_dir)
+
+    if is_cancelled(cancel_flag):
+        raise JobCancelledException("Job cancelled after intro generation")
+
+    # 2. Item segments
+    num_items = len(sorted_items)
+    item_segments: list[Path] = []
+    for idx, item in enumerate(sorted_items):
+        if is_cancelled(cancel_flag):
+            raise JobCancelledException(f"Job cancelled before item #{item.get('rank')}")
+
+        pct = 15 + int((idx / num_items) * 60)
+        report(pct, f"Building segment for #{item.get('rank')} ({item.get('title')})...")
+
+        seg = build_item(cfg_dict, item, idx, work_dir, base_data_dir=base_data_dir)
+        item_segments.append(seg)
+
+    if is_cancelled(cancel_flag):
+        raise JobCancelledException("Job cancelled after items generation")
+
+    # 3. Concatenate all segments
+    report(80, "Joining all video segments...")
+    all_segments = [intro_seg] + item_segments
+    joined_video = concat_segments(all_segments, work_dir)
+
+    if is_cancelled(cancel_flag):
+        raise JobCancelledException("Job cancelled after segment concatenation")
+
+    # 4. Background music & final output
+    report(90, "Finalizing audio and background music...")
+    bgm_id = cfg_dict.get("bgm")
+    bgm_path = None
+    if bgm_id:
+        bgm_path = get_source(bgm_id, downloads_dir, uploads_dir)
+
+    final_output = job_path / "output.mp4"
+    bgm_volume = float(cfg_dict.get("bgm_volume", 0.25))
+    add_bgm(joined_video, bgm_path, bgm_volume, final_output)
+
+    report(100, "Render completed successfully!")
+    return final_output
+
 
 
 
