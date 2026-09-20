@@ -1,8 +1,12 @@
 import glob
 import hashlib
 from pathlib import Path
-import shutil
+import math
 import subprocess
+import shutil
+import json
+import logging
+import re
 import sys
 import time
 from typing import Any
@@ -562,6 +566,22 @@ def build_rank_ladder_ass(
     return "\n".join(ass_lines) + "\n"
 
 
+def sanitize_color(color_str: str) -> str:
+    if not color_str:
+        return "white"
+    color_str = str(color_str).strip()
+    
+    rgba_match = re.search(r'rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)', color_str, re.IGNORECASE)
+    if rgba_match:
+        r, g, b = map(int, rgba_match.group(1, 2, 3))
+        hex_color = f"#{r:02x}{g:02x}{b:02x}"
+        if rgba_match.group(4) is not None:
+            a = float(rgba_match.group(4))
+            return f"{hex_color}@{a}"
+        return hex_color
+    return color_str
+
+
 def apply_elements_to_filter_chains(
     elements: list[dict | Any],
     segment_type: str,
@@ -581,9 +601,8 @@ def apply_elements_to_filter_chains(
     cancel_flag=None,
 ) -> str:
     """
-    Applies timed text, image, sticker, and emoji overlay elements to filter_chains.
-    Correctly computes local timestamps for global timeline elements.
-    Returns the updated output video label.
+    Given a list of elements, applies them via FFmpeg filters.
+    Returns the final video label after all elements are applied.
     """
     if not elements:
         return current_v_label
@@ -594,6 +613,8 @@ def apply_elements_to_filter_chains(
             elem = elem.model_dump()
         elif hasattr(elem, "dict"):
             elem = elem.dict()
+        elif isinstance(elem, dict):
+            pass
         else:
             elem = dict(elem)
 
@@ -656,10 +677,13 @@ def apply_elements_to_filter_chains(
             txt_file.write_text(content, encoding="utf-8")
             custom_font = elem.get("font_size")
             font_sz = int(custom_font) if custom_font else max(24, int(height * 0.045 * float(elem.get("scale", 1.0))))
-            color = str(elem.get("color", "white")).strip() or "white"
+            color = sanitize_color(elem.get("color", "white"))
             bg_box = ""
             if elem.get("bg_color"):
-                bg_box = f":box=1:boxcolor={elem.get('bg_color')}@0.75:boxborderw=10"
+                bg_c = sanitize_color(elem.get("bg_color"))
+                if "@" not in bg_c:
+                    bg_c += "@0.75"
+                bg_box = f":box=1:boxcolor={bg_c}:boxborderw=10"
             filter_chains.append(
                 f"[{current_v_label}]drawtext=fontfile=font.ttf:textfile={txt_file.name}:"
                 f"fontsize={font_sz}:fontcolor={color}:borderw=3:bordercolor=black:"
