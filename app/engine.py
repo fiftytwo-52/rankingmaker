@@ -274,9 +274,13 @@ def build_title_ass_content(
     border_w: int,
     position: str = "center",
     duration: float = 3600.0,
+    font_name: str = "Liberation Sans",
+    bg_style: str = "none",
+    shadow: bool = True,
 ) -> str:
     """
-    Builds an ASS subtitle script string where title words have individual colors.
+    Builds an ASS subtitle script string where title words have individual colors,
+    supporting multiline titles (\\N), selectable font names, background styles, and shadow toggles.
     """
     if position == "center":
         alignment = 5  # middle-center
@@ -285,20 +289,55 @@ def build_title_ass_content(
         alignment = 8  # top-center
         margin_v = max(10, int(height * 0.04))
 
-    # Construct dialogue text with ASS per-word color tags
+    # Construct dialogue text with ASS per-word color tags and multiline handling
     if title_words and len(title_words) > 0:
         parts = []
         for tw in title_words:
             w_text = tw.get("word", "") if isinstance(tw, dict) else getattr(tw, "word", "")
             w_color = tw.get("color", default_accent) if isinstance(tw, dict) else getattr(tw, "color", default_accent)
-            clean_word = str(w_text).replace("{", "").replace("}", "").replace("\\", "")
+            clean_word = (
+                str(w_text)
+                .replace("{", "")
+                .replace("}", "")
+                .replace("\\", "")
+                .replace("\r\n", "\\N")
+                .replace("\n", "\\N")
+            )
             ass_col = color_to_ass(w_color)
             parts.append(f"{{\\c{ass_col}}}{clean_word}")
         dialogue_text = " ".join(parts)
     else:
         ass_col = color_to_ass(default_accent)
-        clean_title = str(title).replace("{", "").replace("}", "").replace("\\", "")
+        clean_title = (
+            str(title)
+            .replace("{", "")
+            .replace("}", "")
+            .replace("\\", "")
+            .replace("\r\n", "\\N")
+            .replace("\n", "\\N")
+        )
         dialogue_text = f"{{\\c{ass_col}}}{clean_title}"
+
+    font_family = font_name if font_name else "Liberation Sans"
+    animated_dialogue = f"{{\\fad(250,200)}}{dialogue_text}"
+
+    bg_s = str(bg_style or "none").lower().strip()
+    if bg_s in ["dark", "solid", "accent"]:
+        border_style = 3  # Opaque box
+        outline_val = max(4, int(font_size * 0.15))
+        shadow_val = 0
+        if bg_s == "solid":
+            back_col = "&H00000000"
+        elif bg_s == "accent":
+            hex_acc = color_to_ass(default_accent).replace("&H", "").replace("&", "")
+            back_col = f"&H40{hex_acc}"
+        else:  # "dark"
+            back_col = "&H66000000"
+    else:
+        border_style = 1
+        outline_val = border_w if shadow else 0
+        shadow_val = 2 if shadow else 0
+        back_col = "&H80000000"
 
     return f"""[Script Info]
 ScriptType: v4.00+
@@ -307,12 +346,304 @@ PlayResY: {height}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: TitleStyle,Liberation Sans,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{border_w},1,{alignment},20,20,{margin_v},1
+Style: TitleStyle,{font_family},{font_size},&H00FFFFFF,&H000000FF,&H00000000,{back_col},-1,0,0,0,100,100,0,0,{border_style},{outline_val},{shadow_val},{alignment},20,20,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:59:59.00,TitleStyle,,0,0,0,,{dialogue_text}
+Dialogue: 0,0:00:00.00,0:59:59.00,TitleStyle,,0,0,0,,{animated_dialogue}
 """
+
+
+def build_color_grading_filters(cfg: dict) -> str:
+    """
+    Constructs an FFmpeg filter string for color grading presets and fine-tuning sliders.
+    Alters the visual fingerprint of footage for anti-copyright uniqueness and aesthetic styling.
+    """
+    preset = str(cfg.get("color_grading_preset", "none")).lower().strip()
+    c_mult = float(cfg.get("color_contrast", 1.0))
+    s_mult = float(cfg.get("color_saturation", 1.0))
+    b_off = float(cfg.get("color_brightness", 0.0))
+    w_off = float(cfg.get("color_warmth", 0.0))
+
+    presets = {
+        "none": {"contrast": 1.0, "saturation": 1.0, "brightness": 0.0, "warmth": 0.0, "cinematic": False},
+        "vibrant": {"contrast": 1.12, "saturation": 1.35, "brightness": 0.02, "warmth": 0.04, "cinematic": False},
+        "cinematic": {"contrast": 1.18, "saturation": 1.12, "brightness": -0.02, "warmth": 0.12, "cinematic": True},
+        "warm_vintage": {"contrast": 1.06, "saturation": 1.10, "brightness": 0.03, "warmth": 0.28, "cinematic": False},
+        "cool_noir": {"contrast": 1.20, "saturation": 0.85, "brightness": -0.03, "warmth": -0.22, "cinematic": False},
+        "neon_punch": {"contrast": 1.25, "saturation": 1.50, "brightness": 0.0, "warmth": -0.08, "cinematic": False},
+        "film_matte": {"contrast": 0.95, "saturation": 0.92, "brightness": 0.04, "warmth": 0.06, "cinematic": False},
+    }
+
+    p = presets.get(preset, presets["none"])
+    final_contrast = max(0.4, min(2.5, p["contrast"] * c_mult))
+    final_saturation = max(0.0, min(3.0, p["saturation"] * s_mult))
+    final_brightness = max(-0.4, min(0.4, p["brightness"] + b_off))
+    final_warmth = max(-1.0, min(1.0, p["warmth"] + w_off))
+
+    filters = []
+    if abs(final_contrast - 1.0) > 0.01 or abs(final_saturation - 1.0) > 0.01 or abs(final_brightness) > 0.005:
+        filters.append(f"eq=contrast={final_contrast:.2f}:brightness={final_brightness:.2f}:saturation={final_saturation:.2f}")
+
+    if p["cinematic"]:
+        filters.append("colorbalance=rs=-0.05:gs=0.01:bs=0.08:rh=0.08:gh=0.02:bh=-0.06")
+    elif abs(final_warmth) > 0.02:
+        rw = final_warmth * 0.08
+        bw = -final_warmth * 0.08
+        filters.append(f"colorbalance=rs={rw:.3f}:bs={bw:.3f}:rm={rw*0.75:.3f}:bm={bw*0.75:.3f}:rh={rw*0.6:.3f}:bh={bw*0.6:.3f}")
+
+    return ",".join(filters)
+
+
+def build_rank_ladder_ass(
+    cfg: dict,
+    items: list,
+    current_idx: int | None,
+    width: int,
+    height: int,
+    duration: float,
+    font_name: str = "Liberation Sans",
+    position: str = "left",
+) -> str:
+    """
+    Generates an ASS subtitle file that renders a persistent vertical ladder
+    of ranking numbers (1, 2, 3, 4, 5...) on the screen edge.
+    If a rank has been revealed in sequence, displays its title.
+    If it is the currently active rank, adds an accent highlight.
+    """
+    if not items:
+        return ""
+
+    # Sort ranks in ascending order (1, 2, 3, 4, 5...)
+    all_ranks = sorted(list(set(int(it.get("rank", i + 1) if isinstance(it, dict) else it.rank) for i, it in enumerate(items))))
+    
+    # Map rank to item
+    rank_to_item = {}
+    for it in items:
+        r = int(it.get("rank", 1) if isinstance(it, dict) else it.rank)
+        rank_to_item[r] = it
+
+    revealed_ranks = set()
+    current_rank = None
+    if current_idx is not None and 0 <= current_idx < len(items):
+        for i in range(current_idx + 1):
+            it = items[i]
+            r = int(it.get("rank", 1) if isinstance(it, dict) else it.rank)
+            revealed_ranks.add(r)
+        active_item = items[current_idx]
+        current_rank = int(active_item.get("rank", 1) if isinstance(active_item, dict) else active_item.rank)
+
+    pos_str = str(position or "left").lower().strip()
+    is_right = pos_str == "right"
+    x_coord = int(width * 0.94) if is_right else int(width * 0.06)
+    align_code = 6 if is_right else 4  # middle-right or middle-left
+
+    start_y = int(height * 0.28)
+    spacing = min(int(height * 0.08), int((height * 0.48) / max(len(all_ranks), 1)))
+    font_size = max(24, int(spacing * 0.50))
+    outline_val = max(3, int(font_size * 0.12))
+    shadow_val = 3
+
+    def fmt_ass_time(sec: float) -> str:
+        s = max(0.0, float(sec))
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        sec_rem = s % 60
+        return f"{h}:{m:02d}:{sec_rem:05.2f}"
+
+    time_start = "0:00:00.00"
+    time_end = fmt_ass_time(duration)
+
+    ass_lines = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        f"PlayResX: {width}",
+        f"PlayResY: {height}",
+        "ScaledBorderAndShadow: yes",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        f"Style: LadderDefault,{font_name},{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,{outline_val},{shadow_val},{align_code},10,10,10,1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+
+    for idx_r, r in enumerate(all_ranks):
+        y_coord = start_y + (idx_r * spacing)
+        
+        # Color styling for rank number
+        if r == 1:
+            num_color = "&H00FFFF&"  # Gold/Yellow
+        elif r == 2:
+            num_color = "&HE0E0E0&"  # Silver
+        elif r == 3:
+            num_color = "&H3090FF&"  # Bronze / Warm Amber
+        else:
+            num_color = "&HFFFFFF&"  # Crisp White
+
+        is_active = (r == current_rank)
+        is_revealed = (r in revealed_ranks)
+
+        if is_active:
+            num_tag = f"{{\\c{num_color}}}{{\\fscx115\\fscy115}}{r}{{\\rLadderDefault}}"
+        else:
+            num_tag = f"{{\\c{num_color}}}{r}{{\\rLadderDefault}}"
+
+        if is_revealed and r in rank_to_item:
+            it = rank_to_item[r]
+            raw_title = str(it.get("title", "") if isinstance(it, dict) else getattr(it, "title", ""))
+            clean_title = (
+                raw_title.replace("{", "").replace("}", "").replace("\\", "").replace("\n", " ").strip()
+            )
+            if len(clean_title) > 28:
+                clean_title = clean_title[:26] + ".."
+            
+            if is_active:
+                title_part = f"  {{\\c&H00FFFF&}}{{\\b1}}{clean_title}{{\\b0}}"
+            else:
+                title_part = f"  {{\\c&HFFFFFF&}}{clean_title}"
+            
+            if is_right:
+                line_text = f"{title_part}  {num_tag}"
+            else:
+                line_text = f"{num_tag}  {title_part}"
+        else:
+            line_text = f"{num_tag}"
+
+        dialogue_event = (
+            f"Dialogue: 1,{time_start},{time_end},LadderDefault,,0,0,0,,"
+            f"{{\\pos({x_coord},{y_coord})}}{line_text}"
+        )
+        ass_lines.append(dialogue_event)
+
+    return "\n".join(ass_lines) + "\n"
+
+
+def apply_elements_to_filter_chains(
+    elements: list[dict | Any],
+    segment_type: str,
+    segment_idx: int | None,
+    duration: float,
+    width: int,
+    height: int,
+    work_dir: Path,
+    uploads_dir: Path,
+    downloads_dir: Path,
+    input_args: list[str],
+    filter_chains: list[str],
+    current_v_label: str,
+    cancel_flag=None,
+) -> str:
+    """
+    Applies timed text, image, sticker, and emoji overlay elements to filter_chains.
+    Returns the updated output video label (e.g. 'v').
+    """
+    if not elements:
+        return current_v_label
+
+    elem_idx = 0
+    for elem in elements:
+        if hasattr(elem, "model_dump"):
+            elem = elem.model_dump()
+        elif hasattr(elem, "dict"):
+            elem = elem.dict()
+        else:
+            elem = dict(elem)
+
+        e_target = str(elem.get("target", "clip")).lower()
+        e_clip_idx = elem.get("clip_index")
+
+        # Check target matching
+        if segment_type == "intro":
+            if e_target not in ["intro", "global"]:
+                continue
+        elif segment_type == "clip":
+            if e_target == "intro":
+                continue
+            if e_target == "clip" and e_clip_idx is not None and int(e_clip_idx) != segment_idx:
+                continue
+
+        t_start = max(0.0, float(elem.get("start_time", 0.0)))
+        t_end = min(duration, float(elem.get("end_time", duration)))
+        if t_end <= t_start or t_start >= duration:
+            continue
+
+        e_type = str(elem.get("type", "text")).lower()
+        content = str(elem.get("content", "")).strip()
+        if not content:
+            continue
+
+        elem_idx += 1
+        next_v_label = f"v_elem_{segment_type}_{segment_idx or 0}_{elem_idx}"
+        pos_x_ratio = max(0.0, min(1.0, float(elem.get("pos_x", 50.0)) / 100.0))
+        pos_y_ratio = max(0.0, min(1.0, float(elem.get("pos_y", 50.0)) / 100.0))
+
+        if e_type == "text":
+            txt_file = work_dir / f"elem_txt_{elem_idx}.txt"
+            txt_file.write_text(content, encoding="utf-8")
+            custom_font = elem.get("font_size")
+            font_sz = int(custom_font) if custom_font else max(20, int(height * 0.045 * float(elem.get("scale", 1.0))))
+            color = str(elem.get("color", "white")).strip() or "white"
+            bg_box = ""
+            if elem.get("bg_color"):
+                bg_box = f":box=1:boxcolor={elem.get('bg_color')}@0.75:boxborderw=10"
+            filter_chains.append(
+                f"[{current_v_label}]drawtext=fontfile=font.ttf:textfile={txt_file.name}:"
+                f"fontsize={font_sz}:fontcolor={color}:borderw=3:bordercolor=black:"
+                f"shadowx=2:shadowy=2:shadowcolor=black@0.75{bg_box}:"
+                f"x=(w-text_w)*{pos_x_ratio}:y=(h-text_h)*{pos_y_ratio}:"
+                f"enable='between(t,{t_start:.2f},{t_end:.2f})'[{next_v_label}]"
+            )
+            current_v_label = next_v_label
+
+        elif e_type in ["image", "sticker", "emoji"]:
+            resolved_img = None
+            if content.startswith("http://") or content.startswith("https://"):
+                try:
+                    resolved_img = get_source(content, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
+                except Exception:
+                    resolved_img = None
+            else:
+                clean_path = content.lstrip("/").replace("uploads/", "")
+                candidates = [
+                    uploads_dir / clean_path,
+                    uploads_dir / "elements" / Path(clean_path).name,
+                    work_dir / clean_path,
+                ]
+                for cand in candidates:
+                    if cand.is_file():
+                        resolved_img = cand
+                        break
+
+            if resolved_img and resolved_img.is_file():
+                inp_idx = input_args.count("-i")
+                input_args.extend(["-loop", "1", "-i", str(resolved_img)])
+                scale_val = float(elem.get("scale", 1.0))
+                target_w = max(32, int(width * 0.28 * scale_val))
+                scaled_elem_label = f"elem_scale_{elem_idx}"
+                filter_chains.append(
+                    f"[{inp_idx}:v]scale={target_w}:-1:force_original_aspect_ratio=decrease[{scaled_elem_label}]"
+                )
+                filter_chains.append(
+                    f"[{current_v_label}][{scaled_elem_label}]overlay="
+                    f"x=(W-w)*{pos_x_ratio}:y=(H-h)*{pos_y_ratio}:"
+                    f"enable='between(t,{t_start:.2f},{t_end:.2f})'[{next_v_label}]"
+                )
+                current_v_label = next_v_label
+            else:
+                txt_file = work_dir / f"elem_emoji_{elem_idx}.txt"
+                txt_file.write_text(content, encoding="utf-8")
+                font_sz = max(24, int(height * 0.07 * float(elem.get("scale", 1.0))))
+                filter_chains.append(
+                    f"[{current_v_label}]drawtext=fontfile=font.ttf:textfile={txt_file.name}:"
+                    f"fontsize={font_sz}:fontcolor=white:borderw=2:bordercolor=black:"
+                    f"x=(w-text_w)*{pos_x_ratio}:y=(h-text_h)*{pos_y_ratio}:"
+                    f"enable='between(t,{t_start:.2f},{t_end:.2f})'[{next_v_label}]"
+                )
+                current_v_label = next_v_label
+
+    return current_v_label
 
 
 def build_intro(
@@ -355,8 +686,11 @@ def build_intro(
     out_file = work_dir / "seg_intro.mp4"
     bg_image_id = cfg.get("bg_image")
 
-    font_size = max(24, int(min(width, height) / 14))
+    custom_title_font_size = cfg.get("title_font_size")
+    font_size = int(custom_title_font_size) if custom_title_font_size else max(24, int(min(width, height) / 14))
     border_w = max(2, int(font_size / 20))
+    title_bg_style = str(cfg.get("title_bg_style", "none")).lower().strip()
+    title_shadow = bool(cfg.get("title_shadow", True))
 
     if title_words and len(title_words) > 0:
         ass_content = build_title_ass_content(
@@ -369,46 +703,81 @@ def build_intro(
             border_w=border_w,
             position="center",
             duration=intro_seconds + 2.0,
+            font_name=str(cfg.get("font") or "Liberation Sans"),
+            bg_style=title_bg_style,
+            shadow=title_shadow,
         )
         ass_file = work_dir / "intro_title.ass"
         ass_file.write_text(ass_content, encoding="utf-8")
         title_filter = f"ass={ass_file.name}:fontsdir=."
     else:
+        box_param = ""
+        if title_bg_style in ["dark", "solid", "accent"]:
+            box_color = "black@0.6" if title_bg_style == "dark" else ("black" if title_bg_style == "solid" else f"{accent}@0.5")
+            box_param = f":box=1:boxcolor={box_color}:boxborderw=10"
+        shadow_param = ":shadowx=2:shadowy=2:shadowcolor=black@0.8" if title_shadow else ""
+        border_param = f":borderw={border_w}:bordercolor=black" if title_shadow else ":borderw=0"
         title_filter = (
             f"drawtext=fontfile=font.ttf:textfile=intro_title.txt:"
-            f"fontsize={font_size}:fontcolor={accent}:borderw={border_w}:bordercolor=black:"
+            f"fontsize={font_size}:fontcolor={accent}{border_param}{shadow_param}{box_param}:"
             f"x=(w-text_w)/2:y=(h-text_h)/2"
         )
 
+    show_rank_ladder = bool(cfg.get("show_rank_ladder", False))
+    ladder_filter = ""
+    if show_rank_ladder:
+        ladder_ass_content = build_rank_ladder_ass(
+            cfg=cfg,
+            items=cfg.get("items", []),
+            current_idx=None,
+            width=width,
+            height=height,
+            duration=intro_seconds + 2.0,
+            font_name=str(cfg.get("font") or "Liberation Sans"),
+            position=str(cfg.get("rank_ladder_position", "left")),
+        )
+        ladder_ass_file = work_dir / "intro_ladder.ass"
+    filter_chains = []
+    input_args = []
     if bg_image_id:
         bg_path = get_source(bg_image_id, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
-        cmd = [
-            "ffmpeg", "-y",
-            "-loop", "1", "-i", str(bg_path),
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-filter_complex",
-            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,{title_filter}[v]",
-            "-map", "[v]",
-            "-map", "1:a",
-            "-t", str(intro_seconds),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            str(out_file),
-        ]
+        input_args.extend(["-loop", "1", "-i", str(bg_path)])
+        filter_chains.append(
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,{title_filter}{ladder_filter}[v_base]"
+        )
     else:
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r=30",
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-filter_complex",
-            f"[0:v]{title_filter}[v]",
-            "-map", "[v]",
-            "-map", "1:a",
-            "-t", str(intro_seconds),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
-            "-c:a", "aac", "-ar", "44100", "-ac", "2",
-            str(out_file),
-        ]
+        input_args.extend(["-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r=30"])
+        filter_chains.append(f"[0:v]{title_filter}{ladder_filter}[v_base]")
+
+    input_args.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"])
+
+    final_v = apply_elements_to_filter_chains(
+        elements=cfg.get("elements", []),
+        segment_type="intro",
+        segment_idx=None,
+        duration=intro_seconds,
+        width=width,
+        height=height,
+        work_dir=work_dir,
+        uploads_dir=uploads_dir,
+        downloads_dir=downloads_dir,
+        input_args=input_args,
+        filter_chains=filter_chains,
+        current_v_label="v_base",
+        cancel_flag=cancel_flag,
+    )
+
+    cmd = [
+        "ffmpeg", "-y",
+        *input_args,
+        "-filter_complex", ";".join(filter_chains),
+        "-map", f"[{final_v}]",
+        "-map", "1:a",
+        "-t", str(intro_seconds),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        str(out_file),
+    ]
 
     res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
@@ -487,16 +856,22 @@ def build_item(
 
     out_file = work_dir / f"seg_{idx}.mp4"
 
-    # Layout sizing
-    box_w = int(width * 0.8)
-    box_h = int(height * 0.6)
-    box_y = int(height * 0.13)
+    # Layout sizing (Full width clip with no horizontal outer padding)
+    box_w = width
+    box_h = int(height * 0.76)
+    box_y = int(height * 0.10)
 
-    top_font_size = max(20, int(min(width, height) / 18))
+    custom_title_font_size = cfg.get("title_font_size")
+    top_font_size = int(custom_title_font_size * 0.8) if custom_title_font_size else max(20, int(min(width, height) / 18))
     top_border_w = max(2, int(top_font_size / 18))
+    title_bg_style = str(cfg.get("title_bg_style", "none")).lower().strip()
+    title_shadow = bool(cfg.get("title_shadow", True))
 
-    label_font_size = max(24, int(min(width, height) / 14))
+    custom_item_font_size = cfg.get("item_font_size")
+    label_font_size = int(custom_item_font_size) if custom_item_font_size else max(24, int(min(width, height) / 14))
     label_border_w = max(3, int(label_font_size / 16))
+    item_bg_style = str(cfg.get("item_bg_style", "dark")).lower().strip()
+    item_shadow = bool(cfg.get("item_shadow", True))
 
     filter_chains = []
     bg_image_id = cfg.get("bg_image")
@@ -528,14 +903,23 @@ def build_item(
             border_w=top_border_w,
             position="top",
             duration=duration + 2.0,
+            font_name=str(cfg.get("font") or "Liberation Sans"),
+            bg_style=title_bg_style,
+            shadow=title_shadow,
         )
         top_ass_file = work_dir / f"top_title_{idx}.ass"
         top_ass_file.write_text(top_ass_content, encoding="utf-8")
         top_filter = f"ass={top_ass_file.name}:fontsdir=."
     else:
+        top_box = ""
+        if title_bg_style in ["dark", "solid", "accent"]:
+            top_box_col = "black@0.6" if title_bg_style == "dark" else ("black" if title_bg_style == "solid" else f"{accent}@0.5")
+            top_box = f":box=1:boxcolor={top_box_col}:boxborderw=8"
+        top_shadow = ":shadowx=2:shadowy=2:shadowcolor=black@0.8" if title_shadow else ""
+        top_border = f":borderw={top_border_w}:bordercolor=black" if title_shadow else ":borderw=0"
         top_filter = (
             f"drawtext=fontfile=font.ttf:textfile={top_title_txt.name}:"
-            f"fontsize={top_font_size}:fontcolor={accent}:borderw={top_border_w}:bordercolor=black:"
+            f"fontsize={top_font_size}:fontcolor={accent}{top_border}{top_shadow}{top_box}:"
             f"x=(w-text_w)/2:y=(h*0.04)"
         )
 
@@ -544,27 +928,120 @@ def build_item(
         f"[bg_base]{top_filter}[bg_with_top]"
     )
 
-    # Scaled clip
-    filter_chains.append(
-        f"[1:v]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,setsar=1[scaled_clip]"
+    # Scaled clip with color grading and framing mode (fit, fill, stretch, blur, card)
+    color_filter_str = build_color_grading_filters(cfg)
+    if color_filter_str:
+        filter_chains.append(f"[1:v]{color_filter_str}[graded_clip]")
+        clip_v_in = "[graded_clip]"
+    else:
+        clip_v_in = "[1:v]"
+
+    clip_fit = str(cfg.get("clip_fit", "fit")).lower().strip()
+    if clip_fit == "fill":
+        filter_chains.append(
+            f"{clip_v_in}scale={box_w}:{box_h}:force_original_aspect_ratio=increase,crop={box_w}:{box_h},setsar=1[scaled_clip]"
+        )
+    elif clip_fit == "stretch":
+        filter_chains.append(
+            f"{clip_v_in}scale={box_w}:{box_h},setsar=1[scaled_clip]"
+        )
+    elif clip_fit == "blur":
+        filter_chains.append(
+            f"{clip_v_in}split=2[v_bg][v_fg];"
+            f"[v_bg]scale={box_w}:{box_h}:force_original_aspect_ratio=increase,crop={box_w}:{box_h},boxblur=24:6,setsar=1[v_blurred];"
+            f"[v_fg]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,setsar=1[v_sharp];"
+            f"[v_blurred][v_sharp]overlay=x=(W-w)/2:y=(H-h)/2[scaled_clip]"
+        )
+    elif clip_fit == "card":
+        card_w = int(box_w * 0.88)
+        card_h = int(box_h * 0.88)
+        border_pad = 10
+        filter_chains.append(
+            f"{clip_v_in}scale={card_w}:{card_h}:force_original_aspect_ratio=decrease,setsar=1,"
+            f"pad=w={card_w + border_pad * 2}:h={card_h + border_pad * 2}:x={border_pad}:y={border_pad}:color=white@0.35[scaled_clip]"
+        )
+    else:  # default 'fit' (contain)
+        filter_chains.append(
+            f"{clip_v_in}scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,setsar=1[scaled_clip]"
+        )
+
+    # Overlay clip on background with smooth transition if enabled
+    enable_transitions = bool(cfg.get("transitions", True))
+    if enable_transitions and duration >= 1.0:
+        filter_chains.append(
+            f"[bg_with_top][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2),fade=t=in:st=0:d=0.25[comp_clip]"
+        )
+    else:
+        filter_chains.append(
+            f"[bg_with_top][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2)[comp_clip]"
+        )
+
+    # Item label placement (bottom, left, or right) with custom font size, background box and shadow
+    label_pos = str(cfg.get("item_label_position", "bottom")).lower().strip()
+    if label_pos == "left":
+        label_x_expr = "w*0.04"
+        label_y_expr = "(h-text_h)/2"
+    elif label_pos == "right":
+        label_x_expr = "w-text_w-(w*0.04)"
+        label_y_expr = "(h-text_h)/2"
+    else:  # default 'bottom'
+        label_x_expr = "(w-text_w)/2"
+        label_y_expr = f"{box_y + box_h}+((h-({box_y + box_h})-text_h)/2)"
+
+    item_box = ""
+    if item_bg_style in ["dark", "solid", "accent"]:
+        item_box_col = "black@0.65" if item_bg_style == "dark" else ("black" if item_bg_style == "solid" else f"{accent}@0.6")
+        item_box = f":box=1:boxcolor={item_box_col}:boxborderw=8"
+    item_shadow_p = ":shadowx=2:shadowy=2:shadowcolor=black@0.8" if item_shadow else ""
+    item_border_p = f":borderw={label_border_w}:bordercolor=black" if item_shadow else ":borderw=0"
+
+    show_rank_ladder = bool(cfg.get("show_rank_ladder", False))
+    if show_rank_ladder:
+        ladder_ass_content = build_rank_ladder_ass(
+            cfg=cfg,
+            items=cfg.get("items", []),
+            current_idx=idx,
+            width=width,
+            height=height,
+            duration=duration + 2.0,
+            font_name=str(cfg.get("font") or "Liberation Sans"),
+            position=str(cfg.get("rank_ladder_position", "left")),
+        )
+        ladder_ass_file = work_dir / f"ladder_{idx}.ass"
+        ladder_ass_file.write_text(ladder_ass_content, encoding="utf-8")
+
+        # When rank ladder is enabled, do NOT burn the separate clip name drawtext since it is already in the ladder
+        filter_chains.append(f"[comp_clip]ass={ladder_ass_file.name}:fontsdir=.[v_pre_elements]")
+    else:
+        filter_chains.append(
+            f"[comp_clip]drawtext=fontfile=font.ttf:textfile={label_txt.name}:"
+            f"fontsize={label_font_size}:fontcolor=white{item_border_p}{item_shadow_p}{item_box}:"
+            f"x={label_x_expr}:y={label_y_expr}[v_pre_elements]"
+        )
+
+    # Apply timed overlay elements
+    final_v = apply_elements_to_filter_chains(
+        elements=cfg.get("elements", []),
+        segment_type="clip",
+        segment_idx=idx,
+        duration=duration,
+        width=width,
+        height=height,
+        work_dir=work_dir,
+        uploads_dir=uploads_dir,
+        downloads_dir=downloads_dir,
+        input_args=input_args,
+        filter_chains=filter_chains,
+        current_v_label="v_pre_elements",
+        cancel_flag=cancel_flag,
     )
 
-    # Overlay clip on background
-    filter_chains.append(
-        f"[bg_with_top][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2)[comp_clip]"
-    )
+    # Audio handling: individual clip volume override (defaults to global clip_volume)
+    item_volume_val = item.get("volume")
+    active_clip_volume = float(item_volume_val) if item_volume_val is not None else float(cfg.get("clip_volume", 1.0))
 
-    # Bottom label
-    label_y_expr = f"{box_y + box_h}+((h-({box_y + box_h})-text_h)/2)"
-    filter_chains.append(
-        f"[comp_clip]drawtext=fontfile=font.ttf:textfile={label_txt.name}:"
-        f"fontsize={label_font_size}:fontcolor=white:borderw={label_border_w}:bordercolor=black:"
-        f"x=(w-text_w)/2:y={label_y_expr}[v]"
-    )
-
-    # Audio handling
     if clip_has_audio:
-        filter_chains.append(f"[1:a]volume={clip_volume},aformat=sample_rates=44100:channel_layouts=stereo[a]")
+        filter_chains.append(f"[1:a]volume={active_clip_volume},aformat=sample_rates=44100:channel_layouts=stereo[a]")
         audio_map = ["[a]"]
     else:
         # Add silent audio generator
@@ -578,7 +1055,7 @@ def build_item(
         "ffmpeg", "-y",
         *input_args,
         "-filter_complex", filter_complex,
-        "-map", "[v]",
+        "-map", f"[{final_v}]",
         "-map", audio_map[0],
         "-t", str(duration),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",

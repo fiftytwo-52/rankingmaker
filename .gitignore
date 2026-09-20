@@ -1,9 +1,34 @@
+# Python virtualenv & bytecode
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+
+# User data / uploaded media (never commit personal videos)
 data/uploads/*
 !data/uploads/.gitkeep
+data/uploads/elements/*
+!data/uploads/elements/.gitkeep
 data/downloads/*
 !data/downloads/.gitkeep
 jobs/*
 !jobs/.gitkeep
+data/scratch/
+
+# Environment / secrets — NEVER commit API keys
+.env
+.env.local
+.env.*.local
+*.secret
+
+# Logs & OS artifacts
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Test scratch output media
+tests/scratch_*/
