@@ -286,6 +286,24 @@ def prepare_font(cfg: dict, work_dir: Path, fonts_dir: Path, uploads_dir: Path) 
     shutil.copyfile(chosen_font_path, dest_font)
     return dest_font
 
+def get_internal_font_name(font_path: Path | str) -> str:
+    """Uses fc-scan to get the actual internal family name of a font file."""
+    try:
+        res = subprocess.run(
+            ["fc-scan", "--format", "%{family}\n", str(font_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+        out = res.stdout.strip()
+        if out:
+            # fc-scan can return multiple names separated by comma, e.g. "Liberation Sans,Liberation Sans"
+            return out.split(",")[0].strip()
+    except Exception:
+        pass
+    return "Liberation Sans"
+
 
 def color_to_ass(c: str) -> str:
     """Converts a CSS color name or hex code (#RRGGBB / 0xRRGGBB) to ASS &HBBGGRR& format."""
@@ -373,17 +391,22 @@ def build_title_ass_content(
         outline_val = max(4, int(font_size * 0.15))
         shadow_val = 0
         if bg_s == "solid":
-            back_col = "&H00000000"
+            hex_acc = color_to_ass(default_accent).replace("&H", "").replace("&", "")
+            back_col = f"&H00{hex_acc}"
+            outline_col = back_col
         elif bg_s == "accent":
             hex_acc = color_to_ass(default_accent).replace("&H", "").replace("&", "")
-            back_col = f"&H40{hex_acc}"
+            back_col = f"&HBF{hex_acc}"  # 25% opaque = 75% transparent (0xBF)
+            outline_col = f"&H66{hex_acc}" # 60% opaque = 40% transparent (0x66)
         else:  # "dark"
-            back_col = "&H66000000"
+            back_col = "&H4D000000"      # 70% opaque = 30% transparent (0x4D)
+            outline_col = back_col
     else:
         border_style = 1
         outline_val = border_w if shadow else 0
         shadow_val = 2 if shadow else 0
         back_col = "&H80000000"
+        outline_col = "&H00000000"
 
     return f"""[Script Info]
 ScriptType: v4.00+
@@ -392,7 +415,7 @@ PlayResY: {height}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: TitleStyle,{font_family},{font_size},&H00FFFFFF,&H000000FF,&H00000000,{back_col},-1,0,0,0,100,100,0,0,{border_style},{outline_val},{shadow_val},{alignment},20,20,{margin_v},1
+Style: TitleStyle,{font_family},{font_size},&H00FFFFFF,&H000000FF,{outline_col},{back_col},-1,0,0,0,100,100,0,0,{border_style},{outline_val},{shadow_val},{alignment},20,20,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -484,9 +507,30 @@ def build_rank_ladder_ass(
     x_coord = int(width * 0.94) if is_right else int(width * 0.06)
     align_code = 6 if is_right else 4  # middle-right or middle-left
 
-    start_y = int(height * 0.28)
-    spacing = min(int(height * 0.08), int((height * 0.48) / max(len(all_ranks), 1)))
-    font_size = max(24, int(spacing * 0.50))
+    start_y_pct = cfg.get("rank_ladder_start_y", 28)
+    try:
+        start_y_pct = int(start_y_pct)
+    except (TypeError, ValueError):
+        start_y_pct = 28
+    start_y = int(height * (max(5, min(95, start_y_pct)) / 100.0))
+
+    base_spacing = min(int(height * 0.08), int((height * 0.48) / max(len(all_ranks), 1)))
+    font_size = max(24, int(base_spacing * 0.50))
+
+    gap_setting = cfg.get("rank_ladder_gap")
+    if gap_setting is not None:
+        spacing = int(gap_setting)
+    else:
+        spacing = base_spacing
+
+    # Order: desc = highest numbers first (e.g. 5,4,3,2,1 top to bottom)
+    #        asc  = lowest numbers first  (e.g. 1,2,3,4,5 top to bottom)
+    ladder_order = str(cfg.get("rank_ladder_order", "desc")).lower().strip()
+    if ladder_order == "asc":
+        display_ranks = list(all_ranks)  # all_ranks is sorted ascending
+    else:
+        display_ranks = list(reversed(all_ranks))
+
     outline_val = max(3, int(font_size * 0.12))
     shadow_val = 3
 
@@ -500,6 +544,29 @@ def build_rank_ladder_ass(
     time_start = "0:00:00.00"
     time_end = fmt_ass_time(duration)
 
+    ladder_bg_style = str(cfg.get("rank_ladder_bg_style", "dark")).lower().strip()
+    if ladder_bg_style in ["dark", "solid", "accent"]:
+        border_style = 3
+        outline_val_bg = max(4, int(font_size * 0.15))
+        shadow_val_bg = 0
+        if ladder_bg_style == "solid":
+            hex_acc = color_to_ass(cfg.get("accent", "#ffff00")).replace("&H", "").replace("&", "")
+            back_col = f"&H00{hex_acc}"
+            outline_col = back_col
+        elif ladder_bg_style == "accent":
+            hex_acc = color_to_ass(cfg.get("accent", "#ffff00")).replace("&H", "").replace("&", "")
+            back_col = f"&HBF{hex_acc}"
+            outline_col = f"&H66{hex_acc}"
+        else:
+            back_col = "&H4D000000"
+            outline_col = back_col
+    else:
+        border_style = 1
+        outline_val_bg = outline_val
+        shadow_val_bg = shadow_val
+        back_col = "&H80000000"
+        outline_col = "&H00000000"
+
     ass_lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
@@ -509,15 +576,15 @@ def build_rank_ladder_ass(
         "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: LadderDefault,{font_name},{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,{outline_val},{shadow_val},{align_code},10,10,10,1",
+        f"Style: LadderDefault,{font_name},{font_size},&H00FFFFFF,&H000000FF,{outline_col},{back_col},1,0,0,0,100,100,0,0,{border_style},{outline_val_bg},{shadow_val_bg},{align_code},10,10,10,1",
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
 
-    for idx_r, r in enumerate(all_ranks):
+    for idx_r, r in enumerate(display_ranks):
         y_coord = start_y + (idx_r * spacing)
-        
+
         # Color styling for rank number
         if r == 1:
             num_color = "&H00FFFF&"  # Gold/Yellow
@@ -532,9 +599,9 @@ def build_rank_ladder_ass(
         is_revealed = (r in revealed_ranks)
 
         if is_active:
-            num_tag = f"{{\\c{num_color}}}{{\\fscx115\\fscy115}}{r}{{\\rLadderDefault}}"
+            num_tag = f"{{\\c{num_color}}}{{\\fscx115\\fscy115}}{r}.{{\\rLadderDefault}}"
         else:
-            num_tag = f"{{\\c{num_color}}}{r}{{\\rLadderDefault}}"
+            num_tag = f"{{\\c{num_color}}}{r}.{{\\rLadderDefault}}"
 
         if is_revealed and r in rank_to_item:
             it = rank_to_item[r]
@@ -550,15 +617,12 @@ def build_rank_ladder_ass(
             else:
                 title_part = f"  {{\\c&HFFFFFF&}}{clean_title}"
             
-            if is_right:
-                line_text = f"{title_part}  {num_tag}"
-            else:
-                line_text = f"{num_tag}  {title_part}"
+            line_text = f"{num_tag}  {title_part}"
         else:
             line_text = f"{num_tag}"
 
         dialogue_event = (
-            f"Dialogue: 1,{time_start},{time_end},LadderDefault,,0,0,0,,"
+            f"Dialogue: 0,{time_start},{time_end},LadderDefault,,0,0,0,,"
             f"{{\\pos({x_coord},{y_coord})}}{line_text}"
         )
         ass_lines.append(dialogue_event)
@@ -776,6 +840,7 @@ def build_intro(
     downloads_dir = base_data_dir / "downloads"
 
     prepare_font(cfg, work_dir, fonts_dir, uploads_dir)
+    real_font_name = get_internal_font_name(work_dir / "font.ttf")
 
     width = int(cfg.get("width", 1920))
     height = int(cfg.get("height", 1080))
@@ -797,6 +862,16 @@ def build_intro(
     border_w = max(2, int(font_size / 20))
     title_bg_style = str(cfg.get("title_bg_style", "none")).lower().strip()
     title_shadow = bool(cfg.get("title_shadow", True))
+    title_bg_width = str(cfg.get("title_bg_width", "wrap")).lower().strip()
+
+    drawbox_filter = ""
+    if title_bg_width == "full" and title_bg_style in ["dark", "solid", "accent"]:
+        box_c = "black@0.6" if title_bg_style == "dark" else (f"{accent}@1.0" if title_bg_style == "solid" else f"{accent}@0.5")
+        num_lines = len(title.split("\n"))
+        box_h = int(font_size * 1.5 * num_lines)
+        box_y = int((height - box_h) / 2)
+        drawbox_filter = f"drawbox=x=0:y={box_y}:w={width}:h={box_h}:color={box_c}:t=fill,"
+        title_bg_style = "none"  # disable native ass/drawtext box
 
     if title_words and len(title_words) > 0:
         ass_content = build_title_ass_content(
@@ -809,22 +884,22 @@ def build_intro(
             border_w=border_w,
             position="center",
             duration=intro_seconds + 2.0,
-            font_name=str(cfg.get("font") or "Liberation Sans"),
+            font_name=real_font_name,
             bg_style=title_bg_style,
             shadow=title_shadow,
         )
         ass_file = work_dir / "intro_title.ass"
         ass_file.write_text(ass_content, encoding="utf-8")
-        title_filter = f"ass={ass_file.name}:fontsdir=."
+        title_filter = f"{drawbox_filter}ass={ass_file.name}:fontsdir=."
     else:
         box_param = ""
         if title_bg_style in ["dark", "solid", "accent"]:
-            box_color = "black@0.6" if title_bg_style == "dark" else ("black" if title_bg_style == "solid" else f"{accent}@0.5")
+            box_color = "black@0.6" if title_bg_style == "dark" else (f"{accent}@1.0" if title_bg_style == "solid" else f"{accent}@0.5")
             box_param = f":box=1:boxcolor={box_color}:boxborderw=10"
         shadow_param = ":shadowx=2:shadowy=2:shadowcolor=black@0.8" if title_shadow else ""
         border_param = f":borderw={border_w}:bordercolor=black" if title_shadow else ":borderw=0"
         title_filter = (
-            f"drawtext=fontfile=font.ttf:textfile=intro_title.txt:"
+            f"{drawbox_filter}drawtext=fontfile=font.ttf:textfile=intro_title.txt:"
             f"fontsize={font_size}:fontcolor={accent}{border_param}{shadow_param}{box_param}:"
             f"x=(w-text_w)/2:y=(h-text_h)/2"
         )
@@ -1036,7 +1111,7 @@ def build_item(
         border_pad = 10
         filter_chains.append(
             f"{clip_v_in}scale={card_w}:{card_h}:force_original_aspect_ratio=decrease,setsar=1,"
-            f"pad=w={card_w + border_pad * 2}:h={card_h + border_pad * 2}:x={border_pad}:y={border_pad}:color=white@0.35[scaled_clip]"
+            f"pad=w={card_w + border_pad * 2}:h={card_h + border_pad * 2}:x={border_pad}:y={border_pad}:color={accent}@0.4[scaled_clip]"
         )
     else:  # default 'fit' (contain)
         filter_chains.append(
@@ -1045,14 +1120,18 @@ def build_item(
 
     # 1. Overlay scaled clip onto background canvas
     enable_transitions = bool(cfg.get("transitions", True))
-    if enable_transitions and duration >= 1.0:
+    if enable_transitions and duration >= 0.5:
+        # Smooth slide-in from bottom and slide-out to bottom over 0.25s
+        y_expr = f"H+({box_y}+(({box_h}-h)/2)-H)*min(t/0.25,1)+(H-({box_y}+(({box_h}-h)/2)))*max(0,(t-({duration:.3f}-0.25))/0.25)"
         filter_chains.append(
-            f"[bg_base][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2),fade=t=in:st=0:d=0.25[comp_clip]"
+            f"[bg_base][scaled_clip]overlay=x=(W-w)/2:y='{y_expr}'[comp_clip]"
         )
     else:
         filter_chains.append(
             f"[bg_base][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2)[comp_clip]"
         )
+
+    real_font_name = get_internal_font_name(work_dir / "font.ttf")
 
     # 2. Main video title overlay (placed ON TOP of clip composite so it is never occluded)
     title_words = cfg.get("title_words")
@@ -1067,7 +1146,7 @@ def build_item(
             border_w=top_border_w,
             position="top",
             duration=duration + 2.0,
-            font_name=str(cfg.get("font") or "Liberation Sans"),
+            font_name=real_font_name,
             bg_style=title_bg_style,
             shadow=title_shadow,
         )
@@ -1121,7 +1200,7 @@ def build_item(
             width=width,
             height=height,
             duration=duration + 2.0,
-            font_name=str(cfg.get("font") or "Liberation Sans"),
+            font_name=real_font_name,
             position=str(cfg.get("rank_ladder_position", "left")),
         )
         ladder_ass_file = work_dir / f"ladder_{idx}.ass"

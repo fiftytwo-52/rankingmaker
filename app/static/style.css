@@ -1460,7 +1460,7 @@ video#video-preview {
   -webkit-box-decoration-break: clone;
 }
 .title-bg-solid {
-  background-color: #000000 !important;
+  background-color: rgb(var(--live-accent-r, 0), var(--live-accent-g, 0), var(--live-accent-b, 0)) !important;
   padding: 6px 14px !important;
   border-radius: 8px !important;
   display: inline-block;
@@ -1468,8 +1468,8 @@ video#video-preview {
   -webkit-box-decoration-break: clone;
 }
 .title-bg-accent {
-  background-color: rgba(255, 255, 0, 0.25) !important;
-  border: 1px solid rgba(255, 255, 0, 0.6) !important;
+  background-color: rgba(var(--live-accent-r, 255), var(--live-accent-g, 255), var(--live-accent-b, 0), 0.25) !important;
+  border: 1px solid rgba(var(--live-accent-r, 255), var(--live-accent-g, 255), var(--live-accent-b, 0), 0.6) !important;
   padding: 6px 14px !important;
   border-radius: 8px !important;
   backdrop-filter: blur(4px);
@@ -1495,12 +1495,12 @@ video#video-preview {
   backdrop-filter: blur(6px);
 }
 .item-label-bg-solid {
-  background: #000000 !important;
-  border: 1px solid #333333 !important;
+  background: rgb(var(--live-accent-r, 0), var(--live-accent-g, 0), var(--live-accent-b, 0)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 .item-label-bg-accent {
-  background: rgba(255, 255, 0, 0.28) !important;
-  border: 1px solid rgba(255, 255, 0, 0.7) !important;
+  background: rgba(var(--live-accent-r, 255), var(--live-accent-g, 255), var(--live-accent-b, 0), 0.28) !important;
+  border: 1px solid rgba(var(--live-accent-r, 255), var(--live-accent-g, 255), var(--live-accent-b, 0), 0.7) !important;
   color: #ffffff !important;
 }
 .item-label-shadow {
@@ -1649,7 +1649,7 @@ video#video-preview {
   width: 88% !important;
   height: 88% !important;
   border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border: 1.5px solid rgba(var(--live-accent-r, 255), var(--live-accent-g, 255), var(--live-accent-b, 255), 0.5);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75);
   margin: auto;
 }
@@ -1734,15 +1734,12 @@ video#video-preview {
   font-weight: 700;
   color: #fff;
   text-shadow: 0 0 2px #000, 1px 1px 3px rgba(0, 0, 0, 0.95);
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  padding: 2px 7px;
+  padding: 4px 8px;
   border-radius: 4px;
   max-width: 130px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* ==========================================================================
@@ -2034,4 +2031,18 @@ video#video-preview {
 }
 
 
+
+
+.title-bg-full {
+  display: flex !important;
+  width: 100% !important;
+  justify-content: center;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  box-sizing: border-box;
+}
+.title-no-shadow {
+  text-shadow: none !important;
+}
 

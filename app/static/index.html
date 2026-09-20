@@ -217,11 +217,17 @@
             <div class="input-grid-2">
               <div class="form-group">
                 <label for="accent-color">Accent Color</label>
-                <input type="text" id="accent-color" name="accent" value="yellow" placeholder="yellow or #ffcc00">
+                <div style="display: flex; gap: 8px;">
+                  <input type="color" id="accent-color-picker" value="#ffff00" style="width: 40px; padding: 0; cursor: pointer; border-radius: 4px; border: 1px solid var(--color-border);">
+                  <input type="text" id="accent-color" name="accent" value="#ffff00" placeholder="#ffff00" style="flex: 1;">
+                </div>
               </div>
               <div class="form-group">
                 <label for="bg-color">Canvas Color</label>
-                <input type="text" id="bg-color" name="bg_color" value="0x141414" placeholder="0x141414 or black">
+                <div style="display: flex; gap: 8px;">
+                  <input type="color" id="bg-color-picker" value="#141414" style="width: 40px; padding: 0; cursor: pointer; border-radius: 4px; border: 1px solid var(--color-border);">
+                  <input type="text" id="bg-color" name="bg_color" value="#141414" placeholder="#141414" style="flex: 1;">
+                </div>
               </div>
             </div>
 
@@ -294,6 +300,12 @@
               <p style="font-size: 11px; color: var(--color-ink-faint); margin: 0 0 8px 0; line-height: 1.4;">
                 Lists all ranking numbers from 1st frame. Clips reveal their spots one by one as they play.
               </p>
+              <div style="margin-bottom: 8px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--color-ink);">
+                  <input type="checkbox" id="toggle-random-ranks" style="width: auto; height: auto;">
+                  <span>Blind Ranking (Randomize Ranks, Keep last as #1)</span>
+                </label>
+              </div>
               <div class="input-grid-2">
                 <div class="form-group" style="margin: 0;">
                   <label for="rank-ladder-pos">Ladder Position</label>
@@ -301,6 +313,37 @@
                     <option value="left" selected>Left Side (Standard)</option>
                     <option value="right">Right Side</option>
                   </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="rank-ladder-bg-style">Text Background</label>
+                  <select id="rank-ladder-bg-style">
+                    <option value="none">None</option>
+                    <option value="dark" selected>Dark Glass</option>
+                    <option value="solid">Solid Accent</option>
+                  </select>
+                </div>
+              </div>
+              <div class="input-grid-2" style="margin-top: 12px;">
+                <div class="form-group" style="margin: 0;">
+                  <label for="rank-ladder-order">List Order</label>
+                  <select id="rank-ladder-order">
+                    <option value="desc" selected>Descending (e.g. 5 to 1)</option>
+                    <option value="asc">Ascending (e.g. 1 to 5)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="rank-ladder-start-y">Start Y Position (%)</label>
+                  <div class="range-slider-row">
+                    <input type="range" id="rank-ladder-start-y" min="5" max="95" step="1" value="28">
+                    <span id="rank-ladder-start-y-val" class="range-val-badge">28%</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                <label for="rank-ladder-gap">Vertical Spacing (Gap)</label>
+                <div class="range-slider-row">
+                  <input type="range" id="rank-ladder-gap" min="10" max="150" step="5" value="50">
+                  <span id="rank-ladder-gap-val" class="range-val-badge">50px</span>
                 </div>
               </div>
             </div>
@@ -647,14 +690,16 @@
     </section>
   </main>
 
-  <!-- Export Floating Drawer Overlay -->
   <div id="job-status-section">
     <div class="status-header-row">
       <div class="status-tag">
         <span class="status-indicator-dot"></span>
         <span id="job-status-badge">QUEUED</span>
       </div>
-      <button type="button" id="btn-cancel-job" class="btn-ghost-sm btn-danger-sm">Cancel</button>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <button type="button" id="btn-cancel-job" class="btn-ghost-sm btn-danger-sm">Cancel</button>
+        <button type="button" id="btn-close-job-status" class="btn-ghost-sm" style="padding: 2px 6px; font-size: 16px; line-height: 1;" title="Close Panel">&times;</button>
+      </div>
     </div>
 
     <progress id="job-progress-bar" value="0" max="100"></progress>
