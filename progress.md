@@ -19,7 +19,8 @@
   - *2026-09-20 15:01*: Verified and recorded verified OS, Python, FFmpeg, FFprobe, and yt-dlp versions along with run commands in `README.md` and `memory.md`. Touched: `README.md`, `memory.md`.
 
 ## Phase 2: Video engine (no web involved yet)
-- [ ] **2.1** `get_source(source, downloads_dir, uploads_dir)`: returns a local file path for a URL (download via yt-dlp with hash cache) or an uploaded file id.
+- [x] **2.1** `get_source(source, downloads_dir, uploads_dir)`: returns a local file path for a URL (download via yt-dlp with hash cache) or an uploaded file id.
+  - *2026-09-20 15:02*: Implemented `get_source` supporting URL download with MD5 hashing cache and local upload resolution. Tested downloading via HTTP and cache reuse. Touched: `app/engine.py`.
 - [ ] **2.2** `has_audio(path)` and `probe_duration(path)` using ffprobe.
 - [ ] **2.3** `build_intro(cfg, work_dir)`: produces `seg_intro.mp4`.
 - [ ] **2.4** `build_item(cfg, item, idx, work_dir)`: produces one item segment per section 4.
