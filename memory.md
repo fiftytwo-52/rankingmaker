@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 2, Step 2.4 (`build_item(cfg, item, idx, work_dir)` in `app/engine.py`).
+- **Next step:** Phase 2, Step 2.5 (`concat_segments(segments, work_dir)` in `app/engine.py`).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.

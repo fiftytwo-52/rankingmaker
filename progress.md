@@ -25,7 +25,8 @@
   - *2026-09-20 15:03*: Implemented ffprobe-based `has_audio` and `probe_duration`. Tested with generated audio clip (detected audio=True, duration=3.0s) and silent clip (detected audio=False, duration=4.0s). Touched: `app/engine.py`.
 - [x] **2.3** `build_intro(cfg, work_dir)`: produces `seg_intro.mp4`.
   - *2026-09-20 15:03*: Implemented `build_intro` with font management (`font.ttf` copy), title text file handling to avoid escaping issues, configurable resolution/accent/bg, and 44.1kHz silent stereo audio. Tested producing `seg_intro.mp4` with exact 3.0s duration and audio stream. Touched: `app/engine.py`.
-- [ ] **2.4** `build_item(cfg, item, idx, work_dir)`: produces one item segment per section 4.
+- [x] **2.4** `build_item(cfg, item, idx, work_dir)`: produces one item segment per section 4.
+  - *2026-09-20 15:04*: Implemented `build_item` with aspect-ratio-preserving clip scaling (80%x60% canvas box), top title banner, bottom rank/item title label, volume control, and automated silent audio insertion for clips without audio. Touched: `app/engine.py`.
 - [ ] **2.5** `concat_segments(segments, work_dir)`: joins them with the concat demuxer.
 - [ ] **2.6** `add_bgm(joined, bgm, volume, output)`: mixes the looped music.
 - [ ] **2.7** `render(cfg, job_dir, progress_callback, cancel_flag)`: orchestrates everything, sorts items in countdown order, calls `progress_callback(percent, message)` after each stage, and checks `cancel_flag` between stages.

@@ -239,3 +239,144 @@ def build_intro(cfg: dict, work_dir: Path | str, base_data_dir: Path | str = "da
     return out_file
 
 
+def build_item(
+    cfg: dict,
+    item: dict,
+    idx: int,
+    work_dir: Path | str,
+    base_data_dir: Path | str = "data",
+) -> Path:
+    """
+    Produces seg_{idx}.mp4 for one ranked item according to layout specs.
+    """
+    work_dir = Path(work_dir).resolve()
+    work_dir.mkdir(parents=True, exist_ok=True)
+    base_data_dir = Path(base_data_dir).resolve()
+    fonts_dir = base_data_dir / "fonts"
+    uploads_dir = base_data_dir / "uploads"
+    downloads_dir = base_data_dir / "downloads"
+
+    prepare_font(cfg, work_dir, fonts_dir, uploads_dir)
+
+    width = int(cfg.get("width", 1920))
+    height = int(cfg.get("height", 1080))
+    accent = str(cfg.get("accent", "yellow"))
+    bg_color = str(cfg.get("bg_color", "0x141414"))
+    clip_volume = float(cfg.get("clip_volume", 1.0))
+    top_title = str(cfg.get("title", ""))
+
+    start = float(item.get("start", 0))
+    if item.get("end") is not None and item.get("start") is not None:
+        duration = max(0.5, float(item["end"]) - float(item["start"]))
+    elif item.get("duration") is not None:
+        duration = max(0.5, float(item["duration"]))
+    else:
+        duration = max(0.5, float(cfg.get("clip_seconds", 8)))
+
+    rank = item.get("rank", idx + 1)
+    item_title = str(item.get("title", ""))
+    label_text = f"#{rank}  {item_title}"
+
+    # Write text files to avoid escaping bugs
+    top_title_txt = work_dir / f"top_title_{idx}.txt"
+    top_title_txt.write_text(top_title, encoding="utf-8")
+
+    label_txt = work_dir / f"item_label_{idx}.txt"
+    label_txt.write_text(label_text, encoding="utf-8")
+
+    # Resolve clip source
+    clip_source = item.get("source", "")
+    clip_path = get_source(clip_source, downloads_dir, uploads_dir)
+    clip_has_audio = has_audio(clip_path)
+
+    out_file = work_dir / f"seg_{idx}.mp4"
+
+    # Layout sizing
+    box_w = int(width * 0.8)
+    box_h = int(height * 0.6)
+    box_y = int(height * 0.13)
+
+    top_font_size = max(20, int(min(width, height) / 18))
+    top_border_w = max(2, int(top_font_size / 18))
+
+    label_font_size = max(24, int(min(width, height) / 14))
+    label_border_w = max(3, int(label_font_size / 16))
+
+    filter_chains = []
+    bg_image_id = cfg.get("bg_image")
+
+    # Background
+    if bg_image_id:
+        bg_path = get_source(bg_image_id, downloads_dir, uploads_dir)
+        input_args = [
+            "-loop", "1", "-i", str(bg_path),
+            "-ss", str(start), "-t", str(duration), "-i", str(clip_path),
+        ]
+        filter_chains.append(f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1[bg_base]")
+    else:
+        input_args = [
+            "-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r=30",
+            "-ss", str(start), "-t", str(duration), "-i", str(clip_path),
+        ]
+        filter_chains.append("[0:v]setsar=1[bg_base]")
+
+    # Top title over background
+    filter_chains.append(
+        f"[bg_base]drawtext=fontfile=font.ttf:textfile={top_title_txt.name}:"
+        f"fontsize={top_font_size}:fontcolor={accent}:borderw={top_border_w}:bordercolor=black:"
+        f"x=(w-text_w)/2:y=(h*0.04)[bg_with_top]"
+    )
+
+    # Scaled clip
+    filter_chains.append(
+        f"[1:v]scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,setsar=1[scaled_clip]"
+    )
+
+    # Overlay clip on background
+    filter_chains.append(
+        f"[bg_with_top][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2)[comp_clip]"
+    )
+
+    # Bottom label
+    label_y_expr = f"{box_y + box_h}+((h-({box_y + box_h})-text_h)/2)"
+    filter_chains.append(
+        f"[comp_clip]drawtext=fontfile=font.ttf:textfile={label_txt.name}:"
+        f"fontsize={label_font_size}:fontcolor=white:borderw={label_border_w}:bordercolor=black:"
+        f"x=(w-text_w)/2:y={label_y_expr}[v]"
+    )
+
+    # Audio handling
+    if clip_has_audio:
+        filter_chains.append(f"[1:a]volume={clip_volume},aformat=sample_rates=44100:channel_layouts=stereo[a]")
+        audio_map = ["[a]"]
+    else:
+        # Add silent audio generator
+        input_args.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"])
+        filter_chains.append("[2:a]aformat=sample_rates=44100:channel_layouts=stereo[a]")
+        audio_map = ["[a]"]
+
+    filter_complex = ";".join(filter_chains)
+
+    cmd = [
+        "ffmpeg", "-y",
+        *input_args,
+        "-filter_complex", filter_complex,
+        "-map", "[v]",
+        "-map", audio_map[0],
+        "-t", str(duration),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        str(out_file),
+    ]
+
+    res = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"FFmpeg build_item failed for item #{rank}: {res.stderr.strip()}")
+
+    if not out_file.exists():
+        raise FileNotFoundError(f"build_item did not produce {out_file}")
+
+    return out_file
+
+
+
