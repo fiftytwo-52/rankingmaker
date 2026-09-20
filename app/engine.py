@@ -158,19 +158,29 @@ def get_source(
             raise FileNotFoundError(f"Downloaded file for URL not found at {pattern}")
         return matches[0]
 
-    # Check local uploads or paths
+    # Check local uploads, downloads, or direct paths
     direct_path = Path(source_str)
     if direct_path.is_file():
         return direct_path.resolve()
 
-    in_uploads = uploads_dir / source_str
-    if in_uploads.is_file():
-        return in_uploads.resolve()
+    clean_name = source_str.lstrip("/")
+    if clean_name.startswith("data/"):
+        clean_name = clean_name[len("data/"):]
+    if clean_name.startswith("uploads/"):
+        clean_name = clean_name[len("uploads/"):]
+    elif clean_name.startswith("downloads/"):
+        clean_name = clean_name[len("downloads/"):]
 
-    # Try matching file id with any extension in uploads
-    upload_matches = list(uploads_dir.glob(f"{source_str}.*"))
-    if upload_matches:
-        return upload_matches[0].resolve()
+    for base_folder in [downloads_dir, uploads_dir]:
+        in_folder = base_folder / clean_name
+        if in_folder.is_file():
+            return in_folder.resolve()
+        elem_in_folder = base_folder / "elements" / Path(clean_name).name
+        if elem_in_folder.is_file():
+            return elem_in_folder.resolve()
+        matches = list(base_folder.glob(f"{clean_name}.*"))
+        if matches and matches[0].is_file():
+            return matches[0].resolve()
 
     raise FileNotFoundError(f"Source file or upload ID not found: '{source_str}'")
 
@@ -565,11 +575,15 @@ def apply_elements_to_filter_chains(
     input_args: list[str],
     filter_chains: list[str],
     current_v_label: str,
+    seg_global_start: float = 0.0,
+    item_rank: int | None = None,
+    item_orig_idx: int | None = None,
     cancel_flag=None,
 ) -> str:
     """
     Applies timed text, image, sticker, and emoji overlay elements to filter_chains.
-    Returns the updated output video label (e.g. 'v').
+    Correctly computes local timestamps for global timeline elements.
+    Returns the updated output video label.
     """
     if not elements:
         return current_v_label
@@ -583,7 +597,7 @@ def apply_elements_to_filter_chains(
         else:
             elem = dict(elem)
 
-        e_target = str(elem.get("target", "clip")).lower()
+        e_target = str(elem.get("target", "clip")).lower().strip()
         e_clip_idx = elem.get("clip_index")
 
         # Check target matching
@@ -593,13 +607,39 @@ def apply_elements_to_filter_chains(
         elif segment_type == "clip":
             if e_target == "intro":
                 continue
-            if e_target == "clip" and e_clip_idx is not None and int(e_clip_idx) != segment_idx:
-                continue
+            if e_target == "clip":
+                # If specific clip targeted, check matching against segment_idx, item_rank, or item_orig_idx
+                if e_clip_idx is not None and str(e_clip_idx).strip() not in ["", "null", "none"]:
+                    try:
+                        target_num = int(e_clip_idx)
+                        matches = (
+                            (segment_idx is not None and target_num == segment_idx)
+                            or (item_rank is not None and target_num == item_rank)
+                            or (item_orig_idx is not None and target_num == item_orig_idx)
+                        )
+                        if not matches:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
 
-        t_start = max(0.0, float(elem.get("start_time", 0.0)))
-        t_end = min(duration, float(elem.get("end_time", duration)))
-        if t_end <= t_start or t_start >= duration:
-            continue
+        # Compute active timing window inside this segment
+        raw_start = elem.get("start_time")
+        raw_end = elem.get("end_time")
+
+        if e_target == "global":
+            elem_start = max(0.0, float(raw_start) if raw_start is not None else 0.0)
+            elem_end = float(raw_end) if raw_end is not None else (duration + seg_global_start)
+            t_start = max(0.0, elem_start - seg_global_start)
+            t_end = min(duration, elem_end - seg_global_start)
+            if t_end <= t_start or t_start >= duration or t_end <= 0.0:
+                continue
+        else:
+            elem_start = max(0.0, float(raw_start) if raw_start is not None else 0.0)
+            elem_end = float(raw_end) if raw_end is not None else duration
+            t_start = max(0.0, elem_start)
+            t_end = min(duration, elem_end)
+            if t_end <= t_start or t_start >= duration:
+                continue
 
         e_type = str(elem.get("type", "text")).lower()
         content = str(elem.get("content", "")).strip()
@@ -612,10 +652,10 @@ def apply_elements_to_filter_chains(
         pos_y_ratio = max(0.0, min(1.0, float(elem.get("pos_y", 50.0)) / 100.0))
 
         if e_type == "text":
-            txt_file = work_dir / f"elem_txt_{elem_idx}.txt"
+            txt_file = work_dir / f"elem_txt_{segment_type}_{segment_idx or 0}_{elem_idx}.txt"
             txt_file.write_text(content, encoding="utf-8")
             custom_font = elem.get("font_size")
-            font_sz = int(custom_font) if custom_font else max(20, int(height * 0.045 * float(elem.get("scale", 1.0))))
+            font_sz = int(custom_font) if custom_font else max(24, int(height * 0.045 * float(elem.get("scale", 1.0))))
             color = str(elem.get("color", "white")).strip() or "white"
             bg_box = ""
             if elem.get("bg_color"):
@@ -637,14 +677,24 @@ def apply_elements_to_filter_chains(
                 except Exception:
                     resolved_img = None
             else:
-                clean_path = content.lstrip("/").replace("uploads/", "")
+                clean_path = content.lstrip("/")
+                if clean_path.startswith("data/"):
+                    clean_path = clean_path[len("data/"):]
+                if clean_path.startswith("uploads/"):
+                    clean_path = clean_path[len("uploads/"):]
+                elif clean_path.startswith("downloads/"):
+                    clean_path = clean_path[len("downloads/"):]
                 candidates = [
                     uploads_dir / clean_path,
                     uploads_dir / "elements" / Path(clean_path).name,
+                    uploads_dir / Path(clean_path).name,
+                    downloads_dir / clean_path,
+                    downloads_dir / Path(clean_path).name,
                     work_dir / clean_path,
+                    Path(content).resolve() if Path(content).is_file() else None,
                 ]
                 for cand in candidates:
-                    if cand.is_file():
+                    if cand and cand.is_file():
                         resolved_img = cand
                         break
 
@@ -653,20 +703,20 @@ def apply_elements_to_filter_chains(
                 input_args.extend(["-loop", "1", "-i", str(resolved_img)])
                 scale_val = float(elem.get("scale", 1.0))
                 target_w = max(32, int(width * 0.28 * scale_val))
-                scaled_elem_label = f"elem_scale_{elem_idx}"
+                scaled_elem_label = f"elem_scale_{segment_type}_{segment_idx or 0}_{elem_idx}"
                 filter_chains.append(
-                    f"[{inp_idx}:v]scale={target_w}:-1:force_original_aspect_ratio=decrease[{scaled_elem_label}]"
+                    f"[{inp_idx}:v]scale={target_w}:-2:force_original_aspect_ratio=decrease,format=rgba[{scaled_elem_label}]"
                 )
                 filter_chains.append(
                     f"[{current_v_label}][{scaled_elem_label}]overlay="
                     f"x=(W-w)*{pos_x_ratio}:y=(H-h)*{pos_y_ratio}:"
-                    f"enable='between(t,{t_start:.2f},{t_end:.2f})'[{next_v_label}]"
+                    f"enable='between(t,{t_start:.2f},{t_end:.2f})':shortest=0:eof_action=pass[{next_v_label}]"
                 )
                 current_v_label = next_v_label
             else:
-                txt_file = work_dir / f"elem_emoji_{elem_idx}.txt"
+                txt_file = work_dir / f"elem_emoji_{segment_type}_{segment_idx or 0}_{elem_idx}.txt"
                 txt_file.write_text(content, encoding="utf-8")
-                font_sz = max(24, int(height * 0.07 * float(elem.get("scale", 1.0))))
+                font_sz = max(28, int(height * 0.07 * float(elem.get("scale", 1.0))))
                 filter_chains.append(
                     f"[{current_v_label}]drawtext=fontfile=font.ttf:textfile={txt_file.name}:"
                     f"fontsize={font_sz}:fontcolor=white:borderw=2:bordercolor=black:"
@@ -784,7 +834,9 @@ def build_intro(
         input_args.extend(["-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r=30"])
         filter_chains.append(f"[0:v]{title_filter}{ladder_filter}[v_base]")
 
+    silent_idx = input_args.count("-i")
     input_args.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"])
+    filter_chains.append(f"[{silent_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a_intro]")
 
     final_v = apply_elements_to_filter_chains(
         elements=cfg.get("elements", []),
@@ -800,6 +852,7 @@ def build_intro(
         filter_chains=filter_chains,
         current_v_label="v_base",
         cancel_flag=cancel_flag,
+        seg_global_start=0.0,
     )
 
     cmd = [
@@ -807,7 +860,7 @@ def build_intro(
         *input_args,
         "-filter_complex", ";".join(filter_chains),
         "-map", f"[{final_v}]",
-        "-map", "1:a",
+        "-map", "[a_intro]",
         "-t", str(intro_seconds),
         "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-r", "30",
         "-c:a", "aac", "-ar", "44100", "-ac", "2",
@@ -832,6 +885,8 @@ def build_item(
     work_dir: Path | str,
     base_data_dir: Path | str = "data",
     cancel_flag=None,
+    seg_global_start: float = 0.0,
+    orig_idx: int | None = None,
 ) -> Path:
     """
     Produces seg_{idx}.mp4 for one ranked item according to layout specs.
@@ -927,43 +982,6 @@ def build_item(
         ]
         filter_chains.append("[0:v]setsar=1[bg_base]")
 
-    title_words = cfg.get("title_words")
-    if title_words and len(title_words) > 0:
-        top_ass_content = build_title_ass_content(
-            title=top_title,
-            title_words=title_words,
-            default_accent=accent,
-            width=width,
-            height=height,
-            font_size=top_font_size,
-            border_w=top_border_w,
-            position="top",
-            duration=duration + 2.0,
-            font_name=str(cfg.get("font") or "Liberation Sans"),
-            bg_style=title_bg_style,
-            shadow=title_shadow,
-        )
-        top_ass_file = work_dir / f"top_title_{idx}.ass"
-        top_ass_file.write_text(top_ass_content, encoding="utf-8")
-        top_filter = f"ass={top_ass_file.name}:fontsdir=."
-    else:
-        top_box = ""
-        if title_bg_style in ["dark", "solid", "accent"]:
-            top_box_col = "black@0.6" if title_bg_style == "dark" else ("black" if title_bg_style == "solid" else f"{accent}@0.5")
-            top_box = f":box=1:boxcolor={top_box_col}:boxborderw=8"
-        top_shadow = ":shadowx=2:shadowy=2:shadowcolor=black@0.8" if title_shadow else ""
-        top_border = f":borderw={top_border_w}:bordercolor=black" if title_shadow else ":borderw=0"
-        top_filter = (
-            f"drawtext=fontfile=font.ttf:textfile={top_title_txt.name}:"
-            f"fontsize={top_font_size}:fontcolor={accent}{top_border}{top_shadow}{top_box}:"
-            f"x=(w-text_w)/2:y=(h*0.04)"
-        )
-
-    # Top title over background
-    filter_chains.append(
-        f"[bg_base]{top_filter}[bg_with_top]"
-    )
-
     # Scaled clip with color grading and framing mode (fit, fill, stretch, blur, card)
     color_filter_str = build_color_grading_filters(cfg)
     if color_filter_str:
@@ -1001,18 +1019,57 @@ def build_item(
             f"{clip_v_in}scale={box_w}:{box_h}:force_original_aspect_ratio=decrease,setsar=1[scaled_clip]"
         )
 
-    # Overlay clip on background with smooth transition if enabled
+    # 1. Overlay scaled clip onto background canvas
     enable_transitions = bool(cfg.get("transitions", True))
     if enable_transitions and duration >= 1.0:
         filter_chains.append(
-            f"[bg_with_top][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2),fade=t=in:st=0:d=0.25[comp_clip]"
+            f"[bg_base][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2),fade=t=in:st=0:d=0.25[comp_clip]"
         )
     else:
         filter_chains.append(
-            f"[bg_with_top][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2)[comp_clip]"
+            f"[bg_base][scaled_clip]overlay=x=(W-w)/2:y={box_y}+(({box_h}-h)/2)[comp_clip]"
         )
 
-    # Item label placement (bottom, left, or right) with custom font size, background box and shadow
+    # 2. Main video title overlay (placed ON TOP of clip composite so it is never occluded)
+    title_words = cfg.get("title_words")
+    if title_words and len(title_words) > 0:
+        top_ass_content = build_title_ass_content(
+            title=top_title,
+            title_words=title_words,
+            default_accent=accent,
+            width=width,
+            height=height,
+            font_size=top_font_size,
+            border_w=top_border_w,
+            position="top",
+            duration=duration + 2.0,
+            font_name=str(cfg.get("font") or "Liberation Sans"),
+            bg_style=title_bg_style,
+            shadow=title_shadow,
+        )
+        top_ass_file = work_dir / f"top_title_{idx}.ass"
+        top_ass_file.write_text(top_ass_content, encoding="utf-8")
+        top_filter = f"ass={top_ass_file.name}:fontsdir=."
+    else:
+        top_box = ""
+        if title_bg_style in ["dark", "solid", "accent"]:
+            top_box_col = "black@0.6" if title_bg_style == "dark" else ("black" if title_bg_style == "solid" else f"{accent}@0.5")
+            top_box = f":box=1:boxcolor={top_box_col}:boxborderw=8"
+        top_shadow = ":shadowx=2:shadowy=2:shadowcolor=black@0.8" if title_shadow else ""
+        top_border = f":borderw={top_border_w}:bordercolor=black" if title_shadow else ":borderw=0"
+        top_filter = (
+            f"drawtext=fontfile=font.ttf:textfile={top_title_txt.name}:"
+            f"fontsize={top_font_size}:fontcolor={accent}{top_border}{top_shadow}{top_box}:"
+            f"x=(w-text_w)/2:y=(h*0.04)"
+        )
+
+    if top_title.strip():
+        filter_chains.append(f"[comp_clip]{top_filter}[comp_with_top]")
+        current_layer = "comp_with_top"
+    else:
+        current_layer = "comp_clip"
+
+    # 3. Item label placement or rank ladder overlay
     label_pos = str(cfg.get("item_label_position", "bottom")).lower().strip()
     if label_pos == "left":
         label_x_expr = "w*0.04"
@@ -1047,15 +1104,15 @@ def build_item(
         ladder_ass_file.write_text(ladder_ass_content, encoding="utf-8")
 
         # When rank ladder is enabled, do NOT burn the separate clip name drawtext since it is already in the ladder
-        filter_chains.append(f"[comp_clip]ass={ladder_ass_file.name}:fontsdir=.[v_pre_elements]")
+        filter_chains.append(f"[{current_layer}]ass={ladder_ass_file.name}:fontsdir=.[v_pre_elements]")
     else:
         filter_chains.append(
-            f"[comp_clip]drawtext=fontfile=font.ttf:textfile={label_txt.name}:"
+            f"[{current_layer}]drawtext=fontfile=font.ttf:textfile={label_txt.name}:"
             f"fontsize={label_font_size}:fontcolor=white{item_border_p}{item_shadow_p}{item_box}:"
             f"x={label_x_expr}:y={label_y_expr}[v_pre_elements]"
         )
 
-    # Apply timed overlay elements
+    # 4. Apply timed overlay elements (stickers, emojis, custom text, Vecteezy elements)
     final_v = apply_elements_to_filter_chains(
         elements=cfg.get("elements", []),
         segment_type="clip",
@@ -1070,9 +1127,12 @@ def build_item(
         filter_chains=filter_chains,
         current_v_label="v_pre_elements",
         cancel_flag=cancel_flag,
+        seg_global_start=seg_global_start,
+        item_rank=rank,
+        item_orig_idx=orig_idx,
     )
 
-    # Audio handling: individual clip volume override (defaults to global clip_volume)
+    # 5. Audio handling: individual clip volume override (defaults to global clip_volume)
     item_volume_val = item.get("volume")
     active_clip_volume = float(item_volume_val) if item_volume_val is not None else float(cfg.get("clip_volume", 1.0))
 
@@ -1080,9 +1140,10 @@ def build_item(
         filter_chains.append(f"[1:a]volume={active_clip_volume},aformat=sample_rates=44100:channel_layouts=stereo[a]")
         audio_map = ["[a]"]
     else:
-        # Add silent audio generator
+        # Dynamically determine the index for anullsrc
+        silent_idx = input_args.count("-i")
         input_args.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"])
-        filter_chains.append("[2:a]aformat=sample_rates=44100:channel_layouts=stereo[a]")
+        filter_chains.append(f"[{silent_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a]")
         audio_map = ["[a]"]
 
     filter_complex = ";".join(filter_chains)
@@ -1302,6 +1363,7 @@ def render(
     # 2. Item segments
     num_items = len(sorted_items)
     item_segments: list[Path] = []
+    current_global_time = float(cfg_dict.get("intro_seconds", 3.0))
     for idx, item in enumerate(sorted_items):
         if is_cancelled(cancel_flag):
             raise JobCancelledException(f"Job cancelled before item #{item.get('rank')}")
@@ -1309,8 +1371,31 @@ def render(
         pct = 15 + int((idx / num_items) * 60)
         report(pct, f"Building segment for #{item.get('rank')} ({item.get('title')})...")
 
-        seg = build_item(cfg_dict, item, idx, work_dir, base_data_dir=base_data_dir, cancel_flag=cancel_flag)
+        orig_idx = None
+        try:
+            orig_idx = raw_items.index(item)
+        except Exception:
+            pass
+
+        seg = build_item(
+            cfg_dict,
+            item,
+            idx,
+            work_dir,
+            base_data_dir=base_data_dir,
+            cancel_flag=cancel_flag,
+            seg_global_start=current_global_time,
+            orig_idx=orig_idx,
+        )
         item_segments.append(seg)
+
+        if item.get("end") is not None and item.get("start") is not None:
+            dur = max(0.5, float(item["end"]) - float(item["start"]))
+        elif item.get("duration") is not None:
+            dur = max(0.5, float(item["duration"]))
+        else:
+            dur = max(0.5, float(cfg_dict.get("clip_seconds", 8)))
+        current_global_time += dur
 
     if is_cancelled(cancel_flag):
         raise JobCancelledException("Job cancelled after items generation")
