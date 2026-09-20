@@ -52,6 +52,15 @@ def download_job_output(id: str):
     )
 
 
+@app.post("/api/jobs/{id}/cancel")
+def cancel_job_endpoint(id: str):
+    success = job_manager.cancel_job(id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job = job_manager.get_job(id)
+    return {"message": "Job cancelled", "status": job.status.value if job else "cancelled"}
+
+
 @app.get("/")
 def read_root():
     return FileResponse(STATIC_DIR / "index.html")

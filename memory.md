@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 4, Step 4.4 (`POST /api/jobs/{id}/cancel`).
+- **Next step:** Phase 4, Step 4.5 (`POST /api/upload` storing files in `data/uploads/` with generated id).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.

@@ -49,7 +49,8 @@
   - *2026-09-20 15:14*: Added `POST /api/jobs` and `GET /api/jobs/{id}` endpoints. Verified via API client starting job, polling progress incrementally, and reaching 100% done. Touched: `app/main.py`.
 - [x] **4.3** `GET /api/jobs/{id}/download`.
   - *2026-09-20 15:15*: Implemented `GET /api/jobs/{id}/download` returning FileResponse with `video/mp4`. Verified client downloading finished MP4 and validated duration and playable audio stream. Touched: `app/main.py`.
-- [ ] **4.4** `POST /api/jobs/{id}/cancel`.
+- [x] **4.4** `POST /api/jobs/{id}/cancel`.
+  - *2026-09-20 15:17*: Implemented `POST /api/jobs/{id}/cancel` and integrated subprocess termination monitoring via `run_subprocess_with_cancel`. Tested cancelling active rendering job, immediately killing the FFmpeg process and setting status to `cancelled`. Touched: `app/main.py`, `app/engine.py`.
 - [ ] **4.5** `POST /api/upload` storing files in `data/uploads/` with a generated id.
 - [ ] **4.6** Update `docs/APP_DOCUMENTATION.md` with the API section (with example requests).
 

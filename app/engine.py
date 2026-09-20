@@ -1,12 +1,65 @@
-import hashlib
 import glob
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
+import time
 from typing import Any
 
 
-def get_source(source: str, downloads_dir: Path | str, uploads_dir: Path | str) -> Path:
+class JobCancelledException(Exception):
+    """Raised when a job is cancelled by the user or cancel flag."""
+    pass
+
+
+def is_cancelled(cancel_flag) -> bool:
+    if cancel_flag is None:
+        return False
+    if callable(cancel_flag):
+        return bool(cancel_flag())
+    if hasattr(cancel_flag, "is_set"):
+        return bool(cancel_flag.is_set())
+    return bool(cancel_flag)
+
+
+def run_subprocess_with_cancel(cmd: list[str], cwd: str | None = None, cancel_flag=None, **kwargs) -> subprocess.CompletedProcess:
+    """
+    Executes a subprocess command while monitoring cancel_flag.
+    If cancel_flag becomes set, terminates the subprocess immediately.
+    """
+    if is_cancelled(cancel_flag):
+        raise JobCancelledException("Job was cancelled before command execution")
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        **kwargs,
+    )
+
+    while proc.poll() is None:
+        if is_cancelled(cancel_flag):
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            raise JobCancelledException("Subprocess terminated due to cancellation")
+        time.sleep(0.05)
+
+    stdout, stderr = proc.communicate()
+    return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+
+
+
+def get_source(
+    source: str,
+    downloads_dir: Path | str,
+    uploads_dir: Path | str,
+    cancel_flag=None,
+) -> Path:
     """
     Resolves a source string (URL or uploaded file id / local path) to a local Path.
     URLs are cached by MD5 hash in downloads_dir using yt-dlp.
@@ -36,11 +89,11 @@ def get_source(source: str, downloads_dir: Path | str, uploads_dir: Path | str) 
             "-o", output_template,
             source_str,
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = run_subprocess_with_cancel(cmd, cancel_flag=cancel_flag)
         if res.returncode != 0:
             # Try python -m yt_dlp fallback if direct executable failed
             fallback_cmd = [sys.executable, "-m", "yt_dlp", "-f", "bv*[height<=1080]+ba/b", "--merge-output-format", "mp4", "-o", output_template, source_str]
-            res2 = subprocess.run(fallback_cmd, capture_output=True, text=True)
+            res2 = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
             if res2.returncode != 0:
                 raise RuntimeError(f"yt-dlp failed to download URL '{source_str}': {res2.stderr.strip() or res.stderr.strip()}")
 
@@ -164,7 +217,12 @@ def prepare_font(cfg: dict, work_dir: Path, fonts_dir: Path, uploads_dir: Path) 
     return dest_font
 
 
-def build_intro(cfg: dict | Any, work_dir: Path | str, base_data_dir: Path | str = "data") -> Path:
+def build_intro(
+    cfg: dict | Any,
+    work_dir: Path | str,
+    base_data_dir: Path | str = "data",
+    cancel_flag=None,
+) -> Path:
     """
     Produces seg_intro.mp4 in work_dir with background and centered title.
     """
@@ -208,7 +266,7 @@ def build_intro(cfg: dict | Any, work_dir: Path | str, base_data_dir: Path | str
     )
 
     if bg_image_id:
-        bg_path = get_source(bg_image_id, downloads_dir, uploads_dir)
+        bg_path = get_source(bg_image_id, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
         cmd = [
             "ffmpeg", "-y",
             "-loop", "1", "-i", str(bg_path),
@@ -237,7 +295,7 @@ def build_intro(cfg: dict | Any, work_dir: Path | str, base_data_dir: Path | str
             str(out_file),
         ]
 
-    res = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
         raise RuntimeError(f"FFmpeg build_intro failed: {res.stderr.strip()}")
 
@@ -253,6 +311,7 @@ def build_item(
     idx: int,
     work_dir: Path | str,
     base_data_dir: Path | str = "data",
+    cancel_flag=None,
 ) -> Path:
     """
     Produces seg_{idx}.mp4 for one ranked item according to layout specs.
@@ -308,7 +367,7 @@ def build_item(
 
     # Resolve clip source
     clip_source = item.get("source", "")
-    clip_path = get_source(clip_source, downloads_dir, uploads_dir)
+    clip_path = get_source(clip_source, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
     clip_has_audio = has_audio(clip_path)
 
     out_file = work_dir / f"seg_{idx}.mp4"
@@ -329,7 +388,7 @@ def build_item(
 
     # Background
     if bg_image_id:
-        bg_path = get_source(bg_image_id, downloads_dir, uploads_dir)
+        bg_path = get_source(bg_image_id, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
         input_args = [
             "-loop", "1", "-i", str(bg_path),
             "-ss", str(start), "-t", str(duration), "-i", str(clip_path),
@@ -391,7 +450,7 @@ def build_item(
         str(out_file),
     ]
 
-    res = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
         raise RuntimeError(f"FFmpeg build_item failed for item #{rank}: {res.stderr.strip()}")
 
@@ -401,7 +460,11 @@ def build_item(
     return out_file
 
 
-def concat_segments(segments: list[Path | str], work_dir: Path | str) -> Path:
+def concat_segments(
+    segments: list[Path | str],
+    work_dir: Path | str,
+    cancel_flag=None,
+) -> Path:
     """
     Joins multiple identically encoded segments using the FFmpeg concat demuxer with stream copy (-c copy).
     """
@@ -415,7 +478,6 @@ def concat_segments(segments: list[Path | str], work_dir: Path | str) -> Path:
     with open(list_file, "w", encoding="utf-8") as f:
         for seg in segments:
             seg_path = Path(seg).resolve()
-            # Write relative name if in work_dir or absolute if elsewhere
             try:
                 rel_path = seg_path.relative_to(work_dir)
                 f.write(f"file '{rel_path.as_posix()}'\n")
@@ -432,7 +494,7 @@ def concat_segments(segments: list[Path | str], work_dir: Path | str) -> Path:
         str(out_file.name),
     ]
 
-    res = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
         raise RuntimeError(f"FFmpeg concat_segments failed: {res.stderr.strip()}")
 
@@ -447,6 +509,7 @@ def add_bgm(
     bgm: Path | str | None,
     volume: float,
     output: Path | str,
+    cancel_flag=None,
 ) -> Path:
     """
     Mixes looped background music under the joined video at specified volume,
@@ -484,7 +547,7 @@ def add_bgm(
         str(output_path),
     ]
 
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = run_subprocess_with_cancel(cmd, cancel_flag=cancel_flag)
     if res.returncode != 0:
         # Fallback if normalize=0 fails on an older ffmpeg build
         fallback_cmd = [
@@ -501,7 +564,7 @@ def add_bgm(
             "-t", str(video_duration),
             str(output_path),
         ]
-        res_fb = subprocess.run(fallback_cmd, capture_output=True, text=True)
+        res_fb = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
         if res_fb.returncode != 0:
             raise RuntimeError(f"FFmpeg add_bgm failed: {res.stderr.strip() or res_fb.stderr.strip()}")
 
@@ -509,21 +572,6 @@ def add_bgm(
         raise FileNotFoundError(f"add_bgm did not produce {output_path}")
 
     return output_path
-
-
-class JobCancelledException(Exception):
-    """Raised when a job is cancelled by the user or cancel flag."""
-    pass
-
-
-def is_cancelled(cancel_flag) -> bool:
-    if cancel_flag is None:
-        return False
-    if callable(cancel_flag):
-        return bool(cancel_flag())
-    if hasattr(cancel_flag, "is_set"):
-        return bool(cancel_flag.is_set())
-    return bool(cancel_flag)
 
 
 def render(
@@ -578,7 +626,7 @@ def render(
 
     # 1. Intro segment
     report(10, "Building intro segment...")
-    intro_seg = build_intro(cfg_dict, work_dir, base_data_dir=base_data_dir)
+    intro_seg = build_intro(cfg_dict, work_dir, base_data_dir=base_data_dir, cancel_flag=cancel_flag)
 
     if is_cancelled(cancel_flag):
         raise JobCancelledException("Job cancelled after intro generation")
@@ -593,7 +641,7 @@ def render(
         pct = 15 + int((idx / num_items) * 60)
         report(pct, f"Building segment for #{item.get('rank')} ({item.get('title')})...")
 
-        seg = build_item(cfg_dict, item, idx, work_dir, base_data_dir=base_data_dir)
+        seg = build_item(cfg_dict, item, idx, work_dir, base_data_dir=base_data_dir, cancel_flag=cancel_flag)
         item_segments.append(seg)
 
     if is_cancelled(cancel_flag):
@@ -602,7 +650,7 @@ def render(
     # 3. Concatenate all segments
     report(80, "Joining all video segments...")
     all_segments = [intro_seg] + item_segments
-    joined_video = concat_segments(all_segments, work_dir)
+    joined_video = concat_segments(all_segments, work_dir, cancel_flag=cancel_flag)
 
     if is_cancelled(cancel_flag):
         raise JobCancelledException("Job cancelled after segment concatenation")
@@ -612,11 +660,11 @@ def render(
     bgm_id = cfg_dict.get("bgm")
     bgm_path = None
     if bgm_id:
-        bgm_path = get_source(bgm_id, downloads_dir, uploads_dir)
+        bgm_path = get_source(bgm_id, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
 
     final_output = job_path / "output.mp4"
     bgm_volume = float(cfg_dict.get("bgm_volume", 0.25))
-    add_bgm(joined_video, bgm_path, bgm_volume, final_output)
+    add_bgm(joined_video, bgm_path, bgm_volume, final_output, cancel_flag=cancel_flag)
 
     report(100, "Render completed successfully!")
     return final_output
