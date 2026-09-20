@@ -45,6 +45,13 @@
     <div class="form-group">
       <label for="video-title">Main Video Title</label>
       <input type="text" id="video-title" name="title" value="TOP 5 RANKING" placeholder="e.g. TOP 5 GOALS OF THE YEAR" required>
+      <div id="word-colors-wrapper" style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #fafafa;">
+        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <span>Select Color Word-by-Word:</span>
+          <button type="button" id="btn-reset-word-colors" style="font-size: 12px; padding: 2px 8px;">Reset Colors</button>
+        </div>
+        <div id="title-words-container" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+      </div>
     </div>
 
     <div class="form-group">
@@ -56,7 +63,7 @@
     </div>
 
     <div class="form-group">
-      <label for="accent-color">Accent Color (name or hex)</label>
+      <label for="accent-color">Default Accent Color (name or hex)</label>
       <input type="text" id="accent-color" name="accent" value="yellow" placeholder="yellow, cyan, #ffcc00">
     </div>
 
@@ -64,6 +71,48 @@
       <label for="bg-color">Background Color (hex or color name)</label>
       <input type="text" id="bg-color" name="bg_color" value="0x141414" placeholder="0x141414 or black">
     </div>
+
+    <!-- Live Preview Screen -->
+    <fieldset class="form-group" style="border: 1px solid #ccc; padding: 15px; border-radius: 4px; background: #fafafa;">
+      <legend><strong>Live Preview Screen</strong></legend>
+      <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+        <label style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 4px;">
+          <input type="radio" name="preview-mode" value="intro" checked> Intro Screen
+        </label>
+        <label style="font-weight: normal; margin: 0; display: flex; align-items: center; gap: 4px;">
+          <input type="radio" name="preview-mode" value="item"> Item Clip Screen
+        </label>
+        <div id="preview-item-selector-wrapper" style="display: none; align-items: center; gap: 6px;">
+          <span style="font-size: 14px;">Select Item:</span>
+          <select id="preview-item-select" style="width: auto; padding: 3px 8px; font-size: 14px;"></select>
+        </div>
+      </div>
+
+      <div id="preview-frame-container" style="display: flex; justify-content: center; width: 100%;">
+        <div id="preview-screen" style="position: relative; width: 100%; max-width: 540px; aspect-ratio: 16 / 9; background-color: #141414; background-size: cover; background-position: center; border: 2px solid #222; border-radius: 4px; overflow: hidden; box-sizing: border-box; transition: aspect-ratio 0.2s ease;">
+          <!-- Intro View Content -->
+          <div id="preview-intro-content" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;">
+            <div id="preview-intro-title" style="font-size: 26px; font-weight: bold; text-shadow: 2px 2px 4px #000; line-height: 1.3; font-family: sans-serif;"></div>
+          </div>
+
+          <!-- Item View Content -->
+          <div id="preview-item-content" style="display: none; width: 100%; height: 100%; position: relative; box-sizing: border-box;">
+            <!-- Top title banner -->
+            <div id="preview-item-top-title" style="position: absolute; top: 4%; width: 100%; text-align: center; font-size: 16px; font-weight: bold; text-shadow: 1px 1px 3px #000; line-height: 1.2; font-family: sans-serif;"></div>
+            <!-- Scaled clip box (80% x 60% at y=13%) -->
+            <div id="preview-item-clip-box" style="position: absolute; top: 13%; left: 10%; width: 80%; height: 60%; background: #000; border: 1px solid #666; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #ddd; font-size: 13px; border-radius: 2px; text-align: center; padding: 6px; box-sizing: border-box;">
+              <span id="preview-clip-title" style="font-weight: bold; margin-bottom: 4px;">Clip Video Area</span>
+              <span id="preview-clip-source" style="font-size: 11px; color: #aaa; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">(80% x 60% box)</span>
+            </div>
+            <!-- Bottom rank and item title label -->
+            <div id="preview-item-label" style="position: absolute; bottom: 6%; width: 100%; text-align: center; font-size: 20px; font-weight: bold; color: #ffffff; text-shadow: 2px 2px 4px #000; line-height: 1.2; font-family: sans-serif;">
+              #1 Item Title
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #666; text-align: center; margin-top: 6px;">Live layout and word colors mirror the output video in real time.</div>
+    </fieldset>
 
     <fieldset class="form-group" style="border: 1px solid #ccc; padding: 15px; border-radius: 4px;">
       <legend><strong>Media Assets & Audio (Optional)</strong></legend>

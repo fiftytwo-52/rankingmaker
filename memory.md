@@ -1,16 +1,18 @@
 # Working Memory
 
 ## Current status
-functional version complete, ready for polish phase
+functional version complete with live preview and word-by-word title coloring
 
 ## Decisions made
 - **Python Virtual Environment:** Created `.venv` to comply with Python 3.12 PEP 668 package isolation standards while managing FastAPI, uvicorn, pydantic, and yt-dlp.
-- **Per-step Git Commits:** Maintained granular git history across all phases and steps (Phases 0 through 7).
+- **Per-step Git Commits:** Maintained granular git history across all phases and steps (Phases 0 through 7, plus post-phase 7 features).
+- **Word-by-Word Title Coloring via ASS Subtitles:** Implemented per-word color tags `{\c&HBBGGRR&}` using Advanced SubStation Alpha format via FFmpeg `ass` filter. This allows pixel-perfect, multi-color titles in both intro and item top title banners without complicated text metric calculations.
+- **Interactive Live Preview Screen:** Built real-time canvas/DOM preview screen mirroring 16:9 / 9:16 aspect ratios, Intro Screen view, and Item Clip Screen view (clip box, banner, and bottom rank label) as the user types and picks colors.
 - **Bundled Typography:** Bundled Liberation Sans Bold at `data/fonts/default.ttf` to eliminate external font dependencies. Using temporary UTF-8 text files (`textfile=...`) for all FFmpeg `drawtext` operations ensures zero shell escaping hazards across OS environments.
 - **Fast Lossless Demuxer Concatenation:** Standardized all segment outputs (`seg_intro.mp4`, `seg_{idx}.mp4`) to identical parameters (H.264, `yuv420p`, 30 fps, AAC 44.1kHz stereo). Concat demuxer with `-c copy` combines segments in sub-seconds with zero re-encoding artifacts or stutter.
 - **Subprocess Cancellation:** Implemented `run_subprocess_with_cancel` using non-blocking process polling every 50ms against `cancel_flag`. Aborts active FFmpeg or yt-dlp child processes within ~100ms and cleans up cleanly.
 - **yt-dlp Environment Prioritization:** Prioritized current Python environment (`sys.executable -m yt_dlp`) to ensure modern extractors and format support, with graceful fallback to system yt-dlp and direct HTTP streaming for direct media links.
-- **State Persistence:** Form parameters, volume settings, and dynamic item rows persist automatically across browser refreshes via `localStorage` (`ranking_video_form_state`).
+- **State Persistence:** Form parameters, volume settings, word colors, and dynamic item rows persist automatically across browser refreshes via `localStorage` (`ranking_video_form_state`).
 - **Intermediate File Lifecycle:** The intermediate `work/` directory is automatically pruned upon successful render completion, retaining only `output.mp4` and `job.json`.
 
 ## Environment

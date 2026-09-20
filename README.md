@@ -44,21 +44,22 @@ A local web application that automatically generates "Top N" countdown/ranking v
 ## How to Use
 
 1. Enter your main video title (e.g., `TOP 5 GREATEST GOALS`).
-2. Choose a resolution preset:
+2. Customize colors **word-by-word**: Click any word's color picker below the title to set distinct colors for individual words (e.g., `TOP` in gold, `5` in red, `GREATEST` in white).
+3. Choose a resolution preset:
    - `1920x1080` (Landscape / YouTube standard)
    - `1080x1920` (Vertical / Shorts / TikTok / Reels)
-3. Select an accent color for titles and rank banners (e.g., `yellow`, `gold`, `cyan`).
-4. Add ranked items:
+4. Use the **Live Preview Screen** to inspect how your title, colors, background, and clip layout look in real-time. Switch between **Intro Screen** and **Item Clip Screen** views.
+5. Add ranked items:
    - Items auto-number in descending order (e.g., 5 down to 1).
    - Enter item title.
    - Provide a video URL (YouTube, public media link) or click **Upload Clip** to select a local video.
    - Set start and end timestamps in seconds.
-5. (Optional) Visuals & Audio:
+6. (Optional) Visuals & Audio:
    - Upload a custom background image (falls back to solid dark background).
    - Upload a background music track (loops continuously with customizable volume).
    - Adjust clip audio volume slider.
-6. Click **Generate Video** and monitor real-time progress.
-7. Once finished, preview the video directly in the web player, download the MP4, or delete the job when done.
+7. Click **Generate Video** and monitor real-time progress.
+8. Once finished, preview the video directly in the web player, download the MP4, or delete the job when done.
 
 ## Running Automated Tests
 

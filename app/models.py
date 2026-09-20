@@ -11,6 +11,11 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class TitleWord(BaseModel):
+    word: str = Field(..., min_length=1, description="Word text")
+    color: str = Field("white", description="Color name or hex code for this word")
+
+
 class ItemConfig(BaseModel):
     rank: int = Field(..., description="Rank number for countdown")
     title: str = Field(..., min_length=1, description="Title of the item")
@@ -31,6 +36,7 @@ class ItemConfig(BaseModel):
 
 class VideoConfig(BaseModel):
     title: str = Field("TOP RANKING", min_length=1, description="Main title of the video")
+    title_words: Optional[List[TitleWord]] = Field(None, description="Optional word-by-word custom colors for the title")
     width: int = Field(1920, gt=0, le=3840, description="Video width in pixels")
     height: int = Field(1080, gt=0, le=3840, description="Video height in pixels")
     accent: str = Field("yellow", description="Accent color for titles")

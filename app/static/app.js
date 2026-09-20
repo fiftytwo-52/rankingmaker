@@ -68,6 +68,7 @@ function recalcRanks() {
       rankInput.value = total - index; // descending N, N-1, ... 1
     }
   });
+  if (typeof updateLivePreview === "function") updateLivePreview();
 }
 
 function addItem(title = "", source = "", start = 0, end = 8) {
@@ -112,6 +113,7 @@ if (btnUploadBgImage && bgImageFile) {
       bgImageId.value = data.id;
       bgImageFilename.textContent = data.filename;
       btnUploadBgImage.textContent = "Change Image";
+      if (typeof updateLivePreview === "function") updateLivePreview();
       saveFormState();
     } catch (e) {
       alert("Failed to upload background image: " + e.message);
@@ -156,6 +158,7 @@ function getFormConfig() {
 
   return {
     title: (document.getElementById("video-title").value || "TOP RANKING").trim(),
+    title_words: getTitleWordsData(),
     width: width || 1920,
     height: height || 1080,
     accent: (document.getElementById("accent-color").value || "yellow").trim(),
@@ -332,12 +335,259 @@ if (btnCancelJob) {
   btnCancelJob.addEventListener("click", cancelCurrentJob);
 }
 
+// Color helper
+function colorNameToHex(c) {
+  const NAMED = {
+    white: "#ffffff", black: "#000000", red: "#ff0000",
+    green: "#008000", lime: "#00ff00", blue: "#0000ff",
+    yellow: "#ffff00", cyan: "#00ffff", magenta: "#ff00ff",
+    gold: "#ffd700", orange: "#ffa500", pink: "#ffc0cb",
+    purple: "#800080", silver: "#c0c0c0", gray: "#808080"
+  };
+  const str = String(c || "yellow").trim().toLowerCase();
+  if (NAMED[str]) return NAMED[str];
+  let hex = str.replace(/^#/, "");
+  if (hex.startsWith("0x") || hex.startsWith("0X")) hex = hex.slice(2);
+  if (hex.length === 3) hex = hex.split("").map(x => x + x).join("");
+  if (hex.length === 6) return "#" + hex;
+  return "#ffff00";
+}
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Word-by-word title colors
+const titleWordsContainer = document.getElementById("title-words-container");
+const videoTitleInput = document.getElementById("video-title");
+const accentColorInput = document.getElementById("accent-color");
+const btnResetWordColors = document.getElementById("btn-reset-word-colors");
+
+function getTitleWordsData() {
+  if (!titleWordsContainer) return null;
+  const chips = titleWordsContainer.querySelectorAll(".word-chip");
+  if (!chips.length) return null;
+  const words = [];
+  chips.forEach(chip => {
+    const word = chip.dataset.word || "";
+    const color = chip.querySelector(".word-color-input")?.value || "#ffff00";
+    if (word) {
+      words.push({ word, color });
+    }
+  });
+  return words.length > 0 ? words : null;
+}
+
+function renderWordColorChips(savedWords = null) {
+  if (!titleWordsContainer || !videoTitleInput) return;
+  const title = videoTitleInput.value.trim();
+  const words = title ? title.split(/\s+/).filter(Boolean) : [];
+
+  const existingMap = new Map();
+  if (Array.isArray(savedWords)) {
+    savedWords.forEach(sw => {
+      if (sw.word && sw.color) existingMap.set(sw.word, sw.color);
+    });
+  } else {
+    titleWordsContainer.querySelectorAll(".word-chip").forEach(chip => {
+      const w = chip.dataset.word;
+      const c = chip.querySelector(".word-color-input")?.value;
+      if (w && c) existingMap.set(w, c);
+    });
+  }
+
+  const defaultHex = colorNameToHex(accentColorInput?.value || "yellow");
+  titleWordsContainer.innerHTML = "";
+
+  words.forEach(w => {
+    const chip = document.createElement("div");
+    chip.className = "word-chip";
+    chip.dataset.word = w;
+    chip.style = "display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px;";
+
+    const colorVal = existingMap.has(w) ? colorNameToHex(existingMap.get(w)) : defaultHex;
+
+    chip.innerHTML = `
+      <span style="font-weight: 600; font-size: 13px;">${escapeHtml(w)}</span>
+      <input type="color" class="word-color-input" value="${colorVal}" style="width: 26px; height: 22px; padding: 0; border: none; cursor: pointer; border-radius: 2px;">
+    `;
+
+    const colorInput = chip.querySelector(".word-color-input");
+    colorInput.addEventListener("input", () => {
+      updateLivePreview();
+      saveFormState();
+    });
+    colorInput.addEventListener("change", () => {
+      updateLivePreview();
+      saveFormState();
+    });
+
+    titleWordsContainer.appendChild(chip);
+  });
+
+  updateLivePreview();
+}
+
+if (btnResetWordColors) {
+  btnResetWordColors.addEventListener("click", () => {
+    const defaultHex = colorNameToHex(accentColorInput?.value || "yellow");
+    titleWordsContainer?.querySelectorAll(".word-color-input").forEach(inp => {
+      inp.value = defaultHex;
+    });
+    updateLivePreview();
+    saveFormState();
+  });
+}
+
+// Live preview screen
+const previewScreen = document.getElementById("preview-screen");
+const previewIntroContent = document.getElementById("preview-intro-content");
+const previewItemContent = document.getElementById("preview-item-content");
+const previewIntroTitle = document.getElementById("preview-intro-title");
+const previewItemTopTitle = document.getElementById("preview-item-top-title");
+const previewClipTitle = document.getElementById("preview-clip-title");
+const previewClipSource = document.getElementById("preview-clip-source");
+const previewItemLabel = document.getElementById("preview-item-label");
+const previewItemSelectorWrapper = document.getElementById("preview-item-selector-wrapper");
+const previewItemSelect = document.getElementById("preview-item-select");
+const resolutionSelect = document.getElementById("resolution-preset");
+const bgColorInput = document.getElementById("bg-color");
+
+function updateLivePreview() {
+  if (!previewScreen) return;
+
+  const res = resolutionSelect?.value || "1920x1080";
+  if (res === "1080x1920") {
+    previewScreen.style.aspectRatio = "9 / 16";
+    previewScreen.style.maxWidth = "280px";
+  } else {
+    previewScreen.style.aspectRatio = "16 / 9";
+    previewScreen.style.maxWidth = "540px";
+  }
+
+  const rawBg = (bgColorInput?.value || "0x141414").trim();
+  let bgHex = rawBg;
+  if (bgHex.startsWith("0x") || bgHex.startsWith("0X")) {
+    bgHex = "#" + bgHex.slice(2);
+  }
+  previewScreen.style.backgroundColor = bgHex;
+
+  if (bgImageId && bgImageId.value) {
+    previewScreen.style.backgroundImage = `url(/uploads/${bgImageId.value})`;
+  } else {
+    previewScreen.style.backgroundImage = "none";
+  }
+
+  const wordsData = getTitleWordsData();
+  const defaultColor = colorNameToHex(accentColorInput?.value || "yellow");
+  let titleHtml = "";
+
+  if (wordsData && wordsData.length > 0) {
+    titleHtml = wordsData
+      .map(w => `<span style="color: ${w.color};">${escapeHtml(w.word)}</span>`)
+      .join(" ");
+  } else {
+    const rawTitle = (videoTitleInput?.value || "TOP RANKING").trim();
+    titleHtml = `<span style="color: ${defaultColor};">${escapeHtml(rawTitle)}</span>`;
+  }
+
+  const mode = document.querySelector('input[name="preview-mode"]:checked')?.value || "intro";
+
+  if (mode === "intro") {
+    if (previewIntroContent) previewIntroContent.style.display = "flex";
+    if (previewItemContent) previewItemContent.style.display = "none";
+    if (previewItemSelectorWrapper) previewItemSelectorWrapper.style.display = "none";
+    if (previewIntroTitle) previewIntroTitle.innerHTML = titleHtml;
+  } else {
+    if (previewIntroContent) previewIntroContent.style.display = "none";
+    if (previewItemContent) previewItemContent.style.display = "block";
+    if (previewItemSelectorWrapper) previewItemSelectorWrapper.style.display = "inline-flex";
+    if (previewItemTopTitle) previewItemTopTitle.innerHTML = titleHtml;
+
+    const items = getItemsData();
+    if (previewItemSelect) {
+      const prevVal = parseInt(previewItemSelect.value, 10) || 0;
+      previewItemSelect.innerHTML = "";
+      items.forEach((it, idx) => {
+        const opt = document.createElement("option");
+        opt.value = idx;
+        opt.textContent = `#${it.rank} - ${it.title || "Untitled"}`;
+        previewItemSelect.appendChild(opt);
+      });
+      if (previewItemSelect.options.length > prevVal) {
+        previewItemSelect.value = prevVal;
+      }
+    }
+
+    const selectedIdx = previewItemSelect ? (parseInt(previewItemSelect.value, 10) || 0) : 0;
+    const item = items[selectedIdx] || { rank: 1, title: "Item Title", source: "" };
+
+    if (previewClipTitle) {
+      previewClipTitle.textContent = item.title ? item.title : "Clip Video Area";
+    }
+    if (previewClipSource) {
+      previewClipSource.textContent = item.source ? item.source : "(80% x 60% box)";
+    }
+    if (previewItemLabel) {
+      previewItemLabel.textContent = `#${item.rank}  ${item.title || "Item Title"}`;
+    }
+  }
+}
+
+// Preview event wiring
+document.querySelectorAll('input[name="preview-mode"]').forEach(r => {
+  r.addEventListener("change", () => {
+    updateLivePreview();
+    saveFormState();
+  });
+});
+
+if (previewItemSelect) {
+  previewItemSelect.addEventListener("change", updateLivePreview);
+}
+
+if (videoTitleInput) {
+  videoTitleInput.addEventListener("input", () => {
+    renderWordColorChips();
+    updateLivePreview();
+    saveFormState();
+  });
+}
+
+if (accentColorInput) {
+  accentColorInput.addEventListener("input", () => {
+    updateLivePreview();
+    saveFormState();
+  });
+}
+
+if (resolutionSelect) {
+  resolutionSelect.addEventListener("change", () => {
+    updateLivePreview();
+    saveFormState();
+  });
+}
+
+if (bgColorInput) {
+  bgColorInput.addEventListener("input", () => {
+    updateLivePreview();
+    saveFormState();
+  });
+}
+
 const STORAGE_KEY = "ranking_video_form_state";
 
 function saveFormState() {
   try {
     const state = {
       title: document.getElementById("video-title")?.value || "",
+      title_words: getTitleWordsData(),
+      preview_mode: document.querySelector('input[name="preview-mode"]:checked')?.value || "intro",
       resolution: document.getElementById("resolution-preset")?.value || "1920x1080",
       accent: document.getElementById("accent-color")?.value || "yellow",
       bg_color: document.getElementById("bg-color")?.value || "0x141414",
@@ -364,6 +614,10 @@ function loadFormState() {
 
     if (state.title !== undefined && document.getElementById("video-title")) {
       document.getElementById("video-title").value = state.title;
+    }
+    if (state.preview_mode) {
+      const r = document.querySelector(`input[name="preview-mode"][value="${state.preview_mode}"]`);
+      if (r) r.checked = true;
     }
     if (state.resolution && document.getElementById("resolution-preset")) {
       document.getElementById("resolution-preset").value = state.resolution;
@@ -407,8 +661,11 @@ function loadFormState() {
           row.querySelector(".item-rank").value = state.items[idx].rank;
         }
       });
-      return true;
     }
+
+    renderWordColorChips(state.title_words || null);
+    updateLivePreview();
+    return true;
   } catch (e) {
     console.warn("Could not load form state from localStorage:", e);
   }
@@ -418,15 +675,25 @@ function loadFormState() {
 // Auto-save on form edits
 const videoForm = document.getElementById("video-form");
 if (videoForm) {
-  videoForm.addEventListener("input", saveFormState);
-  videoForm.addEventListener("change", saveFormState);
+  videoForm.addEventListener("input", () => {
+    updateLivePreview();
+    saveFormState();
+  });
+  videoForm.addEventListener("change", () => {
+    updateLivePreview();
+    saveFormState();
+  });
 }
 
 // Initial state load
 const loaded = loadFormState();
-if (!loaded && itemsContainer && itemsContainer.children.length === 0) {
-  addItem("Clip 2", "", 0, 8);
-  addItem("Clip 1", "", 0, 8);
+if (!loaded) {
+  if (itemsContainer && itemsContainer.children.length === 0) {
+    addItem("Clip 2", "", 0, 8);
+    addItem("Clip 1", "", 0, 8);
+  }
+  renderWordColorChips();
+  updateLivePreview();
 }
 
 // Expose on window for testing
@@ -439,6 +706,10 @@ window.pollJob = pollJob;
 window.cancelCurrentJob = cancelCurrentJob;
 window.saveFormState = saveFormState;
 window.loadFormState = loadFormState;
+window.getTitleWordsData = getTitleWordsData;
+window.renderWordColorChips = renderWordColorChips;
+window.updateLivePreview = updateLivePreview;
+
 
 
 

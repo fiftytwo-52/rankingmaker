@@ -92,10 +92,20 @@
 - [X] **7.3** Final update of `memory.md`: current status = "functional version complete, ready for polish phase", plus a list of known issues.
   - *2026-09-20 15:38*: Updated `memory.md` marking status as 'functional version complete, ready for polish phase', documented all architectural choices across phases 0 through 7, listed environment details, gotchas/lessons learned, and cataloged known issues. Verified all tasks across all phases are 100% completed. Touched: `memory.md`, `progress.md`.
 
+## Post-Phase 7 Enhancements: Live Preview Screen & Word-by-Word Title Colors
+
+- [X] **E.1** Pydantic `TitleWord` model and `title_words` support in `VideoConfig` (`app/models.py`).
+  - *2026-09-20 15:40*: Added `TitleWord` schema and `title_words: Optional[List[TitleWord]] = None` to `VideoConfig`. Touched: `app/models.py`.
+- [X] **E.2** ASS subtitle generation with exact per-word BGR color tags (`app/engine.py`).
+  - *2026-09-20 15:41*: Added `color_to_ass` and `build_title_ass_content`, integrating ASS subtitle filter in `build_intro` and `build_item` for word-by-word colored titles. Touched: `app/engine.py`.
+- [X] **E.3** Interactive Frontend Live Preview Screen & Word Color Chips (`app/static/index.html`, `app/static/app.js`, `app/main.py`).
+  - *2026-09-20 15:44*: Added dynamic word chip generator with HTML5 color picker per word, reset button, and real-time live preview screen supporting 16:9 / 9:16 aspect ratios, Intro Screen view, Item Clip Screen view, background sync, and `localStorage` persistence. Touched: `app/static/index.html`, `app/static/app.js`, `app/main.py`.
+- [X] **E.4** Automated test suite for word colors & preview screen (`tests/`).
+  - *2026-09-20 15:45*: Created and ran `tests/test_word_colors.py` (engine unit test), `tests/test_frontend_preview.js` (DOM & storage unit test), and `tests/test_e2e_word_colors.py` (end-to-end API rendering test), all passing 100%. Touched: `tests/test_word_colors.py`, `tests/test_frontend_preview.js`, `tests/test_e2e_word_colors.py`.
+
 ## Later / polish ideas
 
 - Visual styling and themes
 - Animated title transitions
 - Sound effects on countdown reveals
-- Live layout preview in web canvas
 - Mobile-friendly responsive adjustments

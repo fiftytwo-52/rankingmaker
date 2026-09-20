@@ -94,6 +94,12 @@ The request payload for rendering videos is validated using Pydantic models in `
 ```json
 {
   "title": "TOP 5 GREATEST MOMENTS",
+  "title_words": [
+    { "word": "TOP", "color": "gold" },
+    { "word": "5", "color": "red" },
+    { "word": "GREATEST", "color": "white" },
+    { "word": "MOMENTS", "color": "cyan" }
+  ],
   "width": 1920,
   "height": 1080,
   "accent": "gold",
@@ -126,8 +132,9 @@ The request payload for rendering videos is validated using Pydantic models in `
 
 ### Validation Rules
 - `title`: Non-empty string. Whitespace is stripped.
+- `title_words`: Optional list of `{ "word": str, "color": str }` enabling per-word color customization.
 - `width`, `height`: Positive integers (presets: `1920x1080` landscape, `1080x1920` portrait/shorts).
-- `accent`: Hex color string (e.g. `yellow`, `gold`, `0xFFD700`, `#FFD700`).
+- `accent`: Hex or named color string (e.g. `yellow`, `gold`, `cyan`, `#FFD700`).
 - `bg_color`: Hex color string for background fallback.
 - `bg_image`: Optional filename/UUID in `data/uploads/` or URL.
 - `bgm`: Optional filename/UUID in `data/uploads/` or URL.
@@ -269,7 +276,7 @@ The video processing engine (`app/engine.py`) is implemented using pure Python f
 ### 5.3 Intro Segment Generation
 - **Function:** `build_intro(cfg, work_dir, base_data_dir)`
 - **Visuals:** Scales/crops background image (if provided) or generates a solid color canvas using `color=c={bg_color}:s={w}x{h}:r=30`.
-- **Text:** Copies font into `work_dir/font.ttf`, writes the title into `intro_title.txt`, and applies `drawtext=fontfile=font.ttf:textfile=intro_title.txt` centered horizontally and vertically in the configured accent color.
+- **Text & Word-by-Word Colors:** If `title_words` is provided, generates an Advanced SubStation Alpha (`.ass`) file with BGR color tags `{\c&HBBGGRR&}` per word, rendered via FFmpeg `ass=intro_title.ass:fontsdir=.` centered horizontally and vertically. If `title_words` is omitted, renders title with `drawtext` using the configured accent color.
 - **Audio:** Synthesizes silent stereo 44.1kHz audio (`anullsrc`) matched to `intro_seconds`.
 - **Output:** `seg_intro.mp4`.
 
@@ -278,7 +285,7 @@ The video processing engine (`app/engine.py`) is implemented using pure Python f
 - **Trimming:** Uses input seeking (`-ss {start} -t {duration} -i {clip}`) for maximum speed.
 - **Layout:**
   - Video canvas: Configured width x height (e.g. 1920x1080 or 1080x1920).
-  - Top header: Main video title in accent color at 4% top margin (`item_top_title_{idx}.txt`).
+  - Top header: Main video title banner rendered at top 4% margin with word-by-word colors via ASS subtitle filter (`top_title_{idx}.ass`) or `drawtext`.
   - Clip box: Scaled with aspect ratio preserved to fit within 80% width x 60% height box, centered horizontally and positioned in the upper-middle area.
   - Bottom label: `#<rank>  <title>` in large white text with black border, centered in the bottom region below the clip.
 - **Audio & Volume:** Scales clip audio with `volume={clip_volume}` and formats to 44.1kHz stereo. If clip lacks audio, generates synchronized silent audio via `anullsrc`.
@@ -316,7 +323,11 @@ Error messages returned in `job.json` and displayed in the frontend include:
 - FFmpeg syntax or filter failures showing the trimmed last lines of FFmpeg stderr.
 
 ### 6.3 Browser State Persistence
-All user inputs in the frontend are automatically saved to `localStorage` under the key `ranking_video_form_state` whenever any form field or item row is modified. Refreshing or reopening the browser instantly restores all titles, options, uploaded asset IDs, and item lists.
+All user inputs in the frontend are automatically saved to `localStorage` under the key `ranking_video_form_state` whenever any form field or item row is modified. Refreshing or reopening the browser instantly restores all titles, options, uploaded asset IDs, word-by-word color selections, and item lists.
+
+### 6.4 Interactive Live Preview Screen & Word-by-Word Color Picker
+- **Word-by-Word Color Picker:** Entering a title in the web UI dynamically generates color chips for every individual word. Users can customize each word's color with an HTML5 color picker.
+- **Live Preview Screen:** An interactive canvas/DOM preview screen mirrors video resolution presets (16:9 landscape vs 9:16 portrait), background colors, uploaded background images, top title banner, 80%x60% clip bounding box, and bottom `#<rank> <title>` labels in real time. Users can toggle between **Intro Screen** and **Item Clip Screen** views.
 
 ---
 

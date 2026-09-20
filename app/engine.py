@@ -241,6 +241,80 @@ def prepare_font(cfg: dict, work_dir: Path, fonts_dir: Path, uploads_dir: Path) 
     return dest_font
 
 
+def color_to_ass(c: str) -> str:
+    """Converts a CSS color name or hex code (#RRGGBB / 0xRRGGBB) to ASS &HBBGGRR& format."""
+    NAMED = {
+        "white": "FFFFFF", "black": "000000", "red": "0000FF",
+        "green": "008000", "lime": "00FF00", "blue": "FF0000",
+        "yellow": "00FFFF", "cyan": "FFFF00", "magenta": "FF00FF",
+        "gold": "00D7FF", "orange": "00A5FF", "pink": "CBC0FF",
+        "purple": "800080", "silver": "C0C0C0", "gray": "808080"
+    }
+    c_str = str(c or "white").strip()
+    if c_str.lower() in NAMED:
+        return f"&H{NAMED[c_str.lower()]}&"
+    hex_val = c_str.lstrip("#")
+    if hex_val.lower().startswith("0x"):
+        hex_val = hex_val[2:]
+    if len(hex_val) == 3:
+        hex_val = "".join([ch * 2 for ch in hex_val])
+    if len(hex_val) == 6:
+        r, g, b = hex_val[0:2], hex_val[2:4], hex_val[4:6]
+        return f"&H{b}{g}{r}&".upper()
+    return "&HFFFFFF&"
+
+
+def build_title_ass_content(
+    title: str,
+    title_words: list | None,
+    default_accent: str,
+    width: int,
+    height: int,
+    font_size: int,
+    border_w: int,
+    position: str = "center",
+    duration: float = 3600.0,
+) -> str:
+    """
+    Builds an ASS subtitle script string where title words have individual colors.
+    """
+    if position == "center":
+        alignment = 5  # middle-center
+        margin_v = 20
+    else:
+        alignment = 8  # top-center
+        margin_v = max(10, int(height * 0.04))
+
+    # Construct dialogue text with ASS per-word color tags
+    if title_words and len(title_words) > 0:
+        parts = []
+        for tw in title_words:
+            w_text = tw.get("word", "") if isinstance(tw, dict) else getattr(tw, "word", "")
+            w_color = tw.get("color", default_accent) if isinstance(tw, dict) else getattr(tw, "color", default_accent)
+            clean_word = str(w_text).replace("{", "").replace("}", "").replace("\\", "")
+            ass_col = color_to_ass(w_color)
+            parts.append(f"{{\\c{ass_col}}}{clean_word}")
+        dialogue_text = " ".join(parts)
+    else:
+        ass_col = color_to_ass(default_accent)
+        clean_title = str(title).replace("{", "").replace("}", "").replace("\\", "")
+        dialogue_text = f"{{\\c{ass_col}}}{clean_title}"
+
+    return f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {width}
+PlayResY: {height}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: TitleStyle,Liberation Sans,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{border_w},1,{alignment},20,20,{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:59:59.00,TitleStyle,,0,0,0,,{dialogue_text}
+"""
+
+
 def build_intro(
     cfg: dict | Any,
     work_dir: Path | str,
@@ -272,6 +346,7 @@ def build_intro(
     accent = str(cfg.get("accent", "yellow"))
     bg_color = str(cfg.get("bg_color", "0x141414"))
     title = str(cfg.get("title", "RANKING VIDEO"))
+    title_words = cfg.get("title_words")
 
     # Write title to text file to avoid escaping bugs
     title_txt = work_dir / "intro_title.txt"
@@ -283,11 +358,27 @@ def build_intro(
     font_size = max(24, int(min(width, height) / 14))
     border_w = max(2, int(font_size / 20))
 
-    drawtext_filter = (
-        f"drawtext=fontfile=font.ttf:textfile=intro_title.txt:"
-        f"fontsize={font_size}:fontcolor={accent}:borderw={border_w}:bordercolor=black:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2"
-    )
+    if title_words and len(title_words) > 0:
+        ass_content = build_title_ass_content(
+            title=title,
+            title_words=title_words,
+            default_accent=accent,
+            width=width,
+            height=height,
+            font_size=font_size,
+            border_w=border_w,
+            position="center",
+            duration=intro_seconds + 2.0,
+        )
+        ass_file = work_dir / "intro_title.ass"
+        ass_file.write_text(ass_content, encoding="utf-8")
+        title_filter = f"ass={ass_file.name}:fontsdir=."
+    else:
+        title_filter = (
+            f"drawtext=fontfile=font.ttf:textfile=intro_title.txt:"
+            f"fontsize={font_size}:fontcolor={accent}:borderw={border_w}:bordercolor=black:"
+            f"x=(w-text_w)/2:y=(h-text_h)/2"
+        )
 
     if bg_image_id:
         bg_path = get_source(bg_image_id, downloads_dir, uploads_dir, cancel_flag=cancel_flag)
@@ -296,7 +387,7 @@ def build_intro(
             "-loop", "1", "-i", str(bg_path),
             "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
             "-filter_complex",
-            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,{drawtext_filter}[v]",
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1,{title_filter}[v]",
             "-map", "[v]",
             "-map", "1:a",
             "-t", str(intro_seconds),
@@ -310,7 +401,7 @@ def build_intro(
             "-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r=30",
             "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
             "-filter_complex",
-            f"[0:v]{drawtext_filter}[v]",
+            f"[0:v]{title_filter}[v]",
             "-map", "[v]",
             "-map", "1:a",
             "-t", str(intro_seconds),
@@ -425,11 +516,32 @@ def build_item(
         ]
         filter_chains.append("[0:v]setsar=1[bg_base]")
 
+    title_words = cfg.get("title_words")
+    if title_words and len(title_words) > 0:
+        top_ass_content = build_title_ass_content(
+            title=top_title,
+            title_words=title_words,
+            default_accent=accent,
+            width=width,
+            height=height,
+            font_size=top_font_size,
+            border_w=top_border_w,
+            position="top",
+            duration=duration + 2.0,
+        )
+        top_ass_file = work_dir / f"top_title_{idx}.ass"
+        top_ass_file.write_text(top_ass_content, encoding="utf-8")
+        top_filter = f"ass={top_ass_file.name}:fontsdir=."
+    else:
+        top_filter = (
+            f"drawtext=fontfile=font.ttf:textfile={top_title_txt.name}:"
+            f"fontsize={top_font_size}:fontcolor={accent}:borderw={top_border_w}:bordercolor=black:"
+            f"x=(w-text_w)/2:y=(h*0.04)"
+        )
+
     # Top title over background
     filter_chains.append(
-        f"[bg_base]drawtext=fontfile=font.ttf:textfile={top_title_txt.name}:"
-        f"fontsize={top_font_size}:fontcolor={accent}:borderw={top_border_w}:bordercolor=black:"
-        f"x=(w-text_w)/2:y=(h*0.04)[bg_with_top]"
+        f"[bg_base]{top_filter}[bg_with_top]"
     )
 
     # Scaled clip
