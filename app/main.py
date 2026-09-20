@@ -45,6 +45,16 @@ def health_check():
     return check_dependencies()
 
 
+@app.get("/api/config")
+def get_frontend_config():
+    """Expose non-secret config to the frontend (credentials come from .env)."""
+    return {
+        "vecteezy_account_id": DEFAULT_VECTEEZY_ACCOUNT_ID,
+        # Only expose key if set — frontend uses it as a pre-fill, user can override
+        "vecteezy_api_key": DEFAULT_VECTEEZY_API_KEY,
+    }
+
+
 @app.post("/api/upload")
 def upload_file(file: UploadFile = File(...)):
     ext = Path(file.filename or "").suffix

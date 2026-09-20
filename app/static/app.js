@@ -948,7 +948,8 @@ if (btnDeleteJob) {
 if (btnGenerate) btnGenerate.addEventListener("click", startJob);
 if (btnExportTop) btnExportTop.addEventListener("click", startJob);
 if (btnAddItem) btnAddItem.addEventListener("click", () => {
-  addItem();
+  const d = typeof getDeckDefaults === "function" ? getDeckDefaults() : { start: 0, end: 8, volume: 1.0 };
+  addItem("", "", d.start, d.end, d.volume);
   timelinePlayer?.buildSegments();
   saveFormState();
 });
@@ -2403,6 +2404,54 @@ if (itemFontSizeInput && itemFontSizeVal) {
 }
 
 // ============================================================================
+// Clip Deck Defaults Panel
+// ============================================================================
+const defaultClipVolInput = document.getElementById("default-clip-volume");
+const defaultClipVolVal = document.getElementById("default-clip-volume-val");
+if (defaultClipVolInput && defaultClipVolVal) {
+  defaultClipVolInput.addEventListener("input", () => {
+    defaultClipVolVal.textContent = `${Math.round(parseFloat(defaultClipVolInput.value) * 100)}%`;
+    saveFormState();
+  });
+}
+
+const transitionDurInput = document.getElementById("transition-duration");
+const transitionDurVal = document.getElementById("transition-duration-val");
+if (transitionDurInput && transitionDurVal) {
+  transitionDurInput.addEventListener("input", () => {
+    transitionDurVal.textContent = `${parseFloat(transitionDurInput.value).toFixed(2)}s`;
+    saveFormState();
+  });
+}
+
+const transitionStyleSelect = document.getElementById("transition-style");
+if (transitionStyleSelect) {
+  transitionStyleSelect.addEventListener("change", saveFormState);
+}
+
+["default-clip-start", "default-clip-end"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", saveFormState);
+});
+
+["global-show-clip-name", "global-show-rank-number", "global-autoplay-preview"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", () => {
+    saveFormState();
+    updateLivePreview();
+  });
+});
+
+/** Returns current deck defaults for use when creating a new item row */
+function getDeckDefaults() {
+  return {
+    start: parseFloat(document.getElementById("default-clip-start")?.value || "0"),
+    end: parseFloat(document.getElementById("default-clip-end")?.value || "8"),
+    volume: parseFloat(document.getElementById("default-clip-volume")?.value || "1.0"),
+  };
+}
+
+// ============================================================================
 // Timed Overlay Elements (Text, Image, Stickers, Emojis & Vecteezy Stock)
 // ============================================================================
 // overlayElements is declared at top of file
@@ -3031,6 +3080,41 @@ async function runVecteezySearch() {
 // Initialize Elements Module
 initElementsModal();
 renderElementsList();
+
+// ─── Auto-load Vecteezy credentials from backend config + localStorage ────
+(async function loadVecteezyCredentials() {
+  const accInput = document.getElementById("vecteezy-account-id-input");
+  const keyInput = document.getElementById("vecteezy-api-key-input");
+  if (!accInput || !keyInput) return;
+
+  // Restore from localStorage first (user's previously entered values take priority)
+  const savedAcc = localStorage.getItem("vecteezy_account_id");
+  const savedKey = localStorage.getItem("vecteezy_api_key");
+  if (savedAcc) accInput.value = savedAcc;
+  if (savedKey) keyInput.value = savedKey;
+
+  // If still blank, fetch from server .env
+  if (!accInput.value || !keyInput.value) {
+    try {
+      const res = await fetch("/api/config");
+      if (res.ok) {
+        const cfg = await res.json();
+        if (cfg.vecteezy_account_id && !accInput.value) {
+          accInput.value = cfg.vecteezy_account_id;
+          localStorage.setItem("vecteezy_account_id", cfg.vecteezy_account_id);
+        }
+        if (cfg.vecteezy_api_key && !keyInput.value) {
+          keyInput.value = cfg.vecteezy_api_key;
+          localStorage.setItem("vecteezy_api_key", cfg.vecteezy_api_key);
+        }
+      }
+    } catch (_) { /* server unavailable, ignore */ }
+  }
+
+  // Save to localStorage whenever user edits them
+  accInput.addEventListener("change", () => localStorage.setItem("vecteezy_account_id", accInput.value));
+  keyInput.addEventListener("change", () => localStorage.setItem("vecteezy_api_key", keyInput.value));
+})();
 
 // Expose on window for automated test suite
 window.addItem = addItem;

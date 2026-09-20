@@ -411,7 +411,80 @@
           </div>
         </div>
 
-        <!-- Group 4: Ranked Countdown Items Deck — spans full width on 2-col, own col on 3-col -->
+        <!-- Group 5: Clip Deck Defaults — fills 3rd col gap in 3-col layout -->
+        <div class="accordion-group open" id="group-deck-defaults">
+          <div class="accordion-header" onclick="toggleAccordion('group-deck-defaults')">
+            <span class="accordion-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
+              Clip Deck Defaults
+            </span>
+            <svg class="accordion-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="accordion-body">
+            <div style="font-size: 11px; color: var(--color-subtext); margin-bottom: 10px; line-height: 1.4;">
+              These values are used as defaults when adding new clip items to the deck.
+            </div>
+
+            <!-- Default clip duration -->
+            <div class="input-grid-2">
+              <div class="form-group">
+                <label for="default-clip-start">Default Start (s)</label>
+                <input type="number" id="default-clip-start" value="0" min="0" max="300" step="0.5" title="Default trim start for new clips">
+              </div>
+              <div class="form-group">
+                <label for="default-clip-end">Default End (s)</label>
+                <input type="number" id="default-clip-end" value="8" min="1" max="300" step="0.5" title="Default trim end for new clips">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 6px;">
+              <label for="default-clip-volume">Default Clip Volume</label>
+              <div class="range-slider-row">
+                <input type="range" id="default-clip-volume" min="0" max="2" step="0.05" value="1.0">
+                <span id="default-clip-volume-val" class="range-val-badge">100%</span>
+              </div>
+            </div>
+
+            <!-- Transition style -->
+            <div class="form-group" style="margin-top: 6px;">
+              <label for="transition-style">Transition Between Clips</label>
+              <select id="transition-style">
+                <option value="fade" selected>Fade — Smooth dissolve</option>
+                <option value="cut">Hard Cut — Instant switch</option>
+                <option value="slide_left">Slide Left</option>
+                <option value="slide_right">Slide Right</option>
+                <option value="zoom_in">Zoom In</option>
+                <option value="flash">Flash / Whiteout</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-top: 6px;">
+              <label for="transition-duration">Transition Duration (s)</label>
+              <div class="range-slider-row">
+                <input type="range" id="transition-duration" min="0.1" max="1.5" step="0.05" value="0.4">
+                <span id="transition-duration-val" class="range-val-badge">0.40s</span>
+              </div>
+            </div>
+
+            <!-- Global toggles -->
+            <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 500;">
+                <input type="checkbox" id="global-show-clip-name" checked style="width: auto; height: auto;">
+                <span>Show clip name on all items</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 500;">
+                <input type="checkbox" id="global-show-rank-number" checked style="width: auto; height: auto;">
+                <span>Show rank number badge</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 500;">
+                <input type="checkbox" id="global-autoplay-preview" checked style="width: auto; height: auto;">
+                <span>Auto-play clips in live preview</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group 6: Ranked Countdown Items Deck — spans full width -->
         <div class="accordion-group open span-full" id="group-items">
           <div class="accordion-header" onclick="toggleAccordion('group-items')">
             <span class="accordion-title">
