@@ -117,7 +117,10 @@
     <div id="job-result-section" style="display: none; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
       <h3>Finished Video</h3>
       <video id="video-preview" controls style="max-width: 100%; max-height: 400px; display: block; margin-bottom: 12px; background: #000; border-radius: 4px;"></video>
-      <a id="download-link" href="#" download class="btn-primary" style="display: inline-block; text-decoration: none; padding: 8px 16px;">Download MP4</a>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <a id="download-link" href="#" download class="btn-primary" style="display: inline-block; text-decoration: none; padding: 8px 16px;">Download MP4</a>
+        <button type="button" id="btn-delete-job" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete Job</button>
+      </div>
     </div>
   </div>
 

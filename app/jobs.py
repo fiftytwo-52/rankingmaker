@@ -161,6 +161,19 @@ class JobManager:
         job.cancel()
         return True
 
+    def delete_job(self, job_id: str) -> bool:
+        import shutil
+        job = self.get_job(job_id)
+        if job and job.status == JobStatus.RUNNING:
+            job.cancel()
+        with self._lock:
+            self._jobs.pop(job_id, None)
+        job_folder = self.jobs_dir / job_id
+        if job_folder.exists():
+            shutil.rmtree(job_folder, ignore_errors=True)
+            return True
+        return False
+
 
 # Global job manager instance
 job_manager = JobManager(Path(__file__).resolve().parent.parent)

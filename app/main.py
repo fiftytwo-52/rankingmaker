@@ -80,6 +80,14 @@ def cancel_job_endpoint(id: str):
     return {"message": "Job cancelled", "status": job.status.value if job else "cancelled"}
 
 
+@app.delete("/api/jobs/{id}")
+def delete_job_endpoint(id: str):
+    success = job_manager.delete_job(id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"message": "Job deleted", "id": id}
+
+
 @app.get("/")
 def read_root():
     return FileResponse(STATIC_DIR / "index.html")

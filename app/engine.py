@@ -674,6 +674,14 @@ def render(
     bgm_volume = float(cfg_dict.get("bgm_volume", 0.25))
     add_bgm(joined_video, bgm_path, bgm_volume, final_output, cancel_flag=cancel_flag)
 
+    # Clean up intermediate work files after success
+    try:
+        import shutil
+        if work_dir.exists():
+            shutil.rmtree(work_dir, ignore_errors=True)
+    except Exception:
+        pass
+
     report(100, "Render completed successfully!")
     return final_output
 

@@ -295,6 +295,24 @@ async function cancelCurrentJob() {
   }
 }
 
+const btnDeleteJob = document.getElementById("btn-delete-job");
+if (btnDeleteJob) {
+  btnDeleteJob.addEventListener("click", async () => {
+    if (!currentJobId) return;
+    if (!confirm("Are you sure you want to delete this job and its files?")) return;
+    try {
+      await fetch(`/api/jobs/${currentJobId}`, { method: "DELETE" });
+      jobStatusSection.style.display = "none";
+      jobResultSection.style.display = "none";
+      videoPreview.pause();
+      videoPreview.removeAttribute("src");
+      currentJobId = null;
+    } catch (e) {
+      alert("Failed to delete job: " + e.message);
+    }
+  });
+}
+
 if (btnGenerate) {
   btnGenerate.addEventListener("click", startJob);
 }
