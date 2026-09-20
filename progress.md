@@ -43,7 +43,8 @@
   - *2026-09-20 15:11*: Adapted `render`, `build_intro`, and `build_item` to directly accept either Pydantic models (`VideoConfig`, `ItemConfig`) or dicts. Verified with `python -m tests.run_sample` passing full validated model. Touched: `app/engine.py`, `tests/run_sample.py`.
 
 ## Phase 4: Jobs and API
-- [ ] **4.1** `app/jobs.py`: job manager that creates `jobs/<id>/`, runs `render()` in a background thread, tracks status/progress/error, and writes `job.json`.
+- [x] **4.1** `app/jobs.py`: job manager that creates `jobs/<id>/`, runs `render()` in a background thread, tracks status/progress/error, and writes `job.json`.
+  - *2026-09-20 15:13*: Implemented `Job` and `JobManager` with background threading, status tracking, JSON state persistence to `jobs/<id>/job.json`, and cancellation handling. Verified with automated job run reaching 100% and producing `output.mp4`. Touched: `app/jobs.py`.
 - [ ] **4.2** `POST /api/jobs` and `GET /api/jobs/{id}`.
 - [ ] **4.3** `GET /api/jobs/{id}/download`.
 - [ ] **4.4** `POST /api/jobs/{id}/cancel`.
