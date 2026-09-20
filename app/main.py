@@ -1,5 +1,7 @@
+import shutil
+import uuid
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -9,6 +11,8 @@ from app.models import VideoConfig
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
+UPLOADS_DIR = BASE_DIR / "data" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Ranking Video Maker")
 
@@ -19,6 +23,21 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/api/health")
 def health_check():
     return check_dependencies()
+
+
+@app.post("/api/upload")
+def upload_file(file: UploadFile = File(...)):
+    ext = Path(file.filename or "").suffix
+    file_id = f"{uuid.uuid4().hex[:12]}{ext}"
+    dest_path = UPLOADS_DIR / file_id
+
+    try:
+        with open(dest_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    finally:
+        file.file.close()
+
+    return {"id": file_id, "filename": file.filename}
 
 
 @app.post("/api/jobs")
