@@ -29,7 +29,8 @@
   - *2026-09-20 15:04*: Implemented `build_item` with aspect-ratio-preserving clip scaling (80%x60% canvas box), top title banner, bottom rank/item title label, volume control, and automated silent audio insertion for clips without audio. Touched: `app/engine.py`.
 - [x] **2.5** `concat_segments(segments, work_dir)`: joins them with the concat demuxer.
   - *2026-09-20 15:04*: Implemented `concat_segments` using FFmpeg concat demuxer with `-c copy`. Tested joining intro (2s) and 2 item segments (2s each) into a glitch-free 6.02s joined video. Touched: `app/engine.py`.
-- [ ] **2.6** `add_bgm(joined, bgm, volume, output)`: mixes the looped music.
+- [x] **2.6** `add_bgm(joined, bgm, volume, output)`: mixes the looped music.
+  - *2026-09-20 15:05*: Implemented `add_bgm` with infinite stream looping, volume scaling, and `amix=inputs=2:duration=first:normalize=0` with exact video duration trimming. Tested looping a 1s audio track over a 3s video with perfect 3.0s boundary termination. Touched: `app/engine.py`.
 - [ ] **2.7** `render(cfg, job_dir, progress_callback, cancel_flag)`: orchestrates everything, sorts items in countdown order, calls `progress_callback(percent, message)` after each stage, and checks `cancel_flag` between stages.
 - [ ] **2.8** Update `docs/APP_DOCUMENTATION.md` with the pipeline section.
 

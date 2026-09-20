@@ -420,5 +420,75 @@ def concat_segments(segments: list[Path | str], work_dir: Path | str) -> Path:
     return out_file
 
 
+def add_bgm(
+    joined: Path | str,
+    bgm: Path | str | None,
+    volume: float,
+    output: Path | str,
+) -> Path:
+    """
+    Mixes looped background music under the joined video at specified volume,
+    trimmed precisely to the video duration. If bgm is None, copies joined to output.
+    """
+    joined_path = Path(joined).resolve()
+    output_path = Path(output).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not bgm:
+        import shutil
+        shutil.copyfile(joined_path, output_path)
+        return output_path
+
+    bgm_path = Path(bgm).resolve()
+    if not bgm_path.is_file():
+        raise FileNotFoundError(f"BGM file not found: {bgm_path}")
+
+    video_duration = probe_duration(joined_path)
+    volume_val = max(0.0, float(volume))
+
+    # Looped BGM mixed with joined audio
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(joined_path),
+        "-stream_loop", "-1", "-i", str(bgm_path),
+        "-filter_complex",
+        f"[1:a]volume={volume_val},aformat=sample_rates=44100:channel_layouts=stereo[bgma];"
+        f"[0:a][bgma]amix=inputs=2:duration=first:normalize=0[aout]",
+        "-map", "0:v",
+        "-map", "[aout]",
+        "-c:v", "copy",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        "-t", str(video_duration),
+        str(output_path),
+    ]
+
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        # Fallback if normalize=0 fails on an older ffmpeg build
+        fallback_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(joined_path),
+            "-stream_loop", "-1", "-i", str(bgm_path),
+            "-filter_complex",
+            f"[1:a]volume={volume_val},aformat=sample_rates=44100:channel_layouts=stereo[bgma];"
+            f"[0:a][bgma]amix=inputs=2:duration=first[aout]",
+            "-map", "0:v",
+            "-map", "[aout]",
+            "-c:v", "copy",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            "-t", str(video_duration),
+            str(output_path),
+        ]
+        res_fb = subprocess.run(fallback_cmd, capture_output=True, text=True)
+        if res_fb.returncode != 0:
+            raise RuntimeError(f"FFmpeg add_bgm failed: {res.stderr.strip() or res_fb.stderr.strip()}")
+
+    if not output_path.exists():
+        raise FileNotFoundError(f"add_bgm did not produce {output_path}")
+
+    return output_path
+
+
+
 
 
