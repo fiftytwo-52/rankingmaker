@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 5, Step 5.2 (Item list with Add/Remove buttons, rank autofill descending, and source input).
+- **Next step:** Phase 5, Step 5.3 (Upload controls for background image and background music with volume input).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.
