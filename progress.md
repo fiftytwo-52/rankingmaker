@@ -13,7 +13,8 @@
 ## Phase 1: Server skeleton and dependency check
 - [x] **1.1** `app/main.py`: FastAPI app with `GET /` serving a placeholder `index.html` ("Ranking Video Maker").
   - *2026-09-20 15:00*: Configured FastAPI application with static files mount and FileResponse serving `index.html` at `GET /`. Verified server runs and returns 200 with page content. Touched: `app/main.py`.
-- [ ] **1.2** `app/deps.py` + `GET /api/health`: detect `ffmpeg`, `ffprobe`, `yt-dlp` on PATH and return versions (or a clear "missing" message).
+- [x] **1.2** `app/deps.py` + `GET /api/health`: detect `ffmpeg`, `ffprobe`, `yt-dlp` on PATH and return versions (or a clear "missing" message).
+  - *2026-09-20 15:00*: Implemented dependency checking in `app/deps.py` and exposed `GET /api/health`. Verified health detection for ffmpeg, ffprobe, yt-dlp and verified clear missing message handling. Touched: `app/deps.py`, `app/main.py`.
 - [ ] **1.3** Record the run command and environment info in `README.md` and `memory.md`.
 
 ## Phase 2: Video engine (no web involved yet)

@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 1, Step 1.2 (`app/deps.py` + `GET /api/health` detecting ffmpeg, ffprobe, yt-dlp).
+- **Next step:** Phase 1, Step 1.3 (Record the run command and environment info in README.md and memory.md).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.
