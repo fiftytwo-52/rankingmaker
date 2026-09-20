@@ -150,7 +150,7 @@ The request payload for rendering videos is validated using Pydantic models in `
 ## 4. API Endpoints
 
 ### 4.1 GET /api/health
-Checks whether `ffmpeg`, `ffprobe`, and `yt-dlp` are installed and available on system PATH.
+Checks that `ffmpeg` and `ffprobe` are available on the system PATH, and reports the **yt-dlp that the render engine actually runs** — the module inside the app's own interpreter (`.venv`), resolved by `app.deps.get_yt_dlp_command()`. A `yt-dlp` executable on PATH is only used when that module is missing, so the report can never disagree with what `Download source` does at render time.
 
 **Response (200 OK):**
 ```json
@@ -169,12 +169,15 @@ Checks whether `ffmpeg`, `ffprobe`, and `yt-dlp` are installed and available on 
     },
     "yt_dlp": {
       "available": true,
-      "version": "2026.8.19",
+      "version": "2026.08.19",
+      "source": "app interpreter: /path/to/.venv/bin/python -m yt_dlp",
       "error": null
     }
   }
 }
 ```
+
+`source` tells you which yt-dlp won the resolution (`app interpreter:` or `PATH executable:`), which is the fastest way to spot a stale distro package such as Ubuntu's `2024.04.09`.
 
 ### 4.2 POST /api/upload
 Uploads a media file (clip, background image, music track, or custom font) to `data/uploads/`.

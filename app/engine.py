@@ -1,10 +1,15 @@
 import glob
 import hashlib
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
 from typing import Any
+import urllib.parse
+import urllib.request
+
+from app.deps import get_yt_dlp_command
 
 
 class JobCancelledException(Exception):
@@ -86,12 +91,11 @@ def get_source(
         if matches:
             return matches[0]
 
-        # Download via yt-dlp
+        # Download via yt-dlp. The command is always resolved through the app interpreter
+        # (app.deps.get_yt_dlp_command) so a stale distro binary on PATH is never used.
+        yt_dlp_base = get_yt_dlp_command()
         output_template = str(downloads_dir / f"{url_hash}.%(ext)s")
-        cmd = [
-            sys.executable,
-            "-m",
-            "yt_dlp",
+        cmd = yt_dlp_base + [
             "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
             "--merge-output-format", "mp4",
             "-o", output_template,
@@ -99,8 +103,9 @@ def get_source(
         ]
         res = run_subprocess_with_cancel(cmd, cancel_flag=cancel_flag)
         if res.returncode != 0:
-            # Fallback to system yt-dlp
-            fallback_cmd = ["yt-dlp", "-f", "bv*[height<=1080]+ba/b/best", "--merge-output-format", "mp4", "-o", output_template, source_str]
+            # Retry with the same tool but a looser format selector: dropping the 1080p cap on
+            # the plain-stream fallback covers videos that only expose one progressive stream.
+            fallback_cmd = yt_dlp_base + ["-f", "bv*[height<=1080]+ba/b/best", "--merge-output-format", "mp4", "-o", output_template, source_str]
             res2 = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
             if res2.returncode != 0:
                 # If both yt-dlp calls fail, check if it's a direct file download
