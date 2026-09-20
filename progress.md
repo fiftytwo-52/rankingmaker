@@ -45,7 +45,8 @@
 ## Phase 4: Jobs and API
 - [x] **4.1** `app/jobs.py`: job manager that creates `jobs/<id>/`, runs `render()` in a background thread, tracks status/progress/error, and writes `job.json`.
   - *2026-09-20 15:13*: Implemented `Job` and `JobManager` with background threading, status tracking, JSON state persistence to `jobs/<id>/job.json`, and cancellation handling. Verified with automated job run reaching 100% and producing `output.mp4`. Touched: `app/jobs.py`.
-- [ ] **4.2** `POST /api/jobs` and `GET /api/jobs/{id}`.
+- [x] **4.2** `POST /api/jobs` and `GET /api/jobs/{id}`.
+  - *2026-09-20 15:14*: Added `POST /api/jobs` and `GET /api/jobs/{id}` endpoints. Verified via API client starting job, polling progress incrementally, and reaching 100% done. Touched: `app/main.py`.
 - [ ] **4.3** `GET /api/jobs/{id}/download`.
 - [ ] **4.4** `POST /api/jobs/{id}/cancel`.
 - [ ] **4.5** `POST /api/upload` storing files in `data/uploads/` with a generated id.
