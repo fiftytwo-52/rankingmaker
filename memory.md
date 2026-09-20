@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 3, Step 3.1 (`app/models.py`: pydantic models for config with validation rules).
+- **Next step:** Phase 3, Step 3.2 (Make `render()` accept the validated model).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.

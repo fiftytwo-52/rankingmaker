@@ -37,7 +37,8 @@
   - *2026-09-20 15:07*: Documented the video processing pipeline in `docs/APP_DOCUMENTATION.md` covering asset caching, probing, intro, item layout, concatenation, and BGM mixing. Touched: `docs/APP_DOCUMENTATION.md`.
 
 ## Phase 3: Config validation
-- [ ] **3.1** `app/models.py`: pydantic models for the config (section 5) with the validation rules.
+- [x] **3.1** `app/models.py`: pydantic models for the config (section 5) with the validation rules.
+  - *2026-09-20 15:10*: Implemented `VideoConfig`, `ItemConfig`, and `JobState` Pydantic models. Verified validation rules for minimum 1 item, unique ranks, and end > start constraints. Touched: `app/models.py`.
 - [ ] **3.2** Make `render()` accept the validated model.
 
 ## Phase 4: Jobs and API
