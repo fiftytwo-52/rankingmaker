@@ -1,11 +1,12 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 0, Step 0.4 (Place a free bold .ttf font in data/fonts/default.ttf).
+- **Next step:** Phase 1, Step 1.1 (`app/main.py`: FastAPI app with `GET /` serving placeholder `index.html`).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.
 - Initialized local git repository for granular per-step commit tracking.
+- Selected Liberation Sans Bold (`/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf`) as the bundled default font and copied to `data/fonts/default.ttf`. System fallback path: `/usr/share/fonts/truetype/freefont/FreeSansBold.ttf`.
 
 ## Environment
 - **OS:** Linux (Ubuntu 24.04 LTS / 6.8 kernel, x86_64)

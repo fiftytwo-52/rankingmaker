@@ -7,7 +7,8 @@
   - *2026-09-20 14:58*: Created progress.md with all phases/steps and memory.md with required sections. Touched: `progress.md`, `memory.md`.
 - [x] **0.3** Create `README.md` (draft) and `docs/APP_DOCUMENTATION.md` (skeleton with headings only).
   - *2026-09-20 14:59*: Created README.md with overview, requirements, run steps, and docs/APP_DOCUMENTATION.md skeleton with all structural headings. Touched: `README.md`, `docs/APP_DOCUMENTATION.md`.
-- [ ] **0.4** Put a free bold `.ttf` font (e.g. DejaVu Sans Bold or Roboto Bold) in `data/fonts/default.ttf`. If you cannot download one, record in `memory.md` that the user must supply a font, and make the app fall back to a font path found on the system.
+- [x] **0.4** Put a free bold `.ttf` font (e.g. DejaVu Sans Bold or Roboto Bold) in `data/fonts/default.ttf`. If you cannot download one, record in `memory.md` that the user must supply a font, and make the app fall back to a font path found on the system.
+  - *2026-09-20 14:59*: Placed LiberationSans-Bold.ttf at `data/fonts/default.ttf` and documented system fallback path in `memory.md`. Touched: `data/fonts/default.ttf`, `memory.md`.
 
 ## Phase 1: Server skeleton and dependency check
 - [ ] **1.1** `app/main.py`: FastAPI app with `GET /` serving a placeholder `index.html` ("Ranking Video Maker").
