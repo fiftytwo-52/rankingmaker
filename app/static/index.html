@@ -66,6 +66,34 @@
     </div>
 
     <fieldset class="form-group" style="border: 1px solid #ccc; padding: 15px; border-radius: 4px;">
+      <legend><strong>Media Assets & Audio (Optional)</strong></legend>
+      <div style="margin-bottom: 12px;">
+        <label>Background Image:</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="file" id="bg-image-file" accept="image/*" style="display: none;">
+          <button type="button" id="btn-upload-bg-image">Choose Background Image</button>
+          <span id="bg-image-filename" style="color: #666; font-size: 14px;">No image selected</span>
+          <input type="hidden" id="bg-image-id">
+        </div>
+      </div>
+      <div>
+        <label>Background Music:</label>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <input type="file" id="bgm-file" accept="audio/*" style="display: none;">
+          <button type="button" id="btn-upload-bgm">Choose Audio Track</button>
+          <span id="bgm-filename" style="color: #666; font-size: 14px;">No music selected</span>
+          <input type="hidden" id="bgm-id">
+          <label style="margin-left: 15px;">BGM Volume:
+            <input type="number" id="bgm-volume" value="0.25" min="0" max="2" step="0.05" style="width: 70px;">
+          </label>
+          <label style="margin-left: 15px;">Clip Volume:
+            <input type="number" id="clip-volume" value="1.0" min="0" max="2" step="0.1" style="width: 70px;">
+          </label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-group" style="border: 1px solid #ccc; padding: 15px; border-radius: 4px;">
       <legend><strong>Ranked Items</strong></legend>
       <div id="items-container"></div>
       <button type="button" id="btn-add-item" style="margin-top: 10px;">+ Add Item</button>

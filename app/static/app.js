@@ -89,6 +89,84 @@ function getItemsData() {
   return items;
 }
 
+// Background image upload
+const bgImageFile = document.getElementById("bg-image-file");
+const btnUploadBgImage = document.getElementById("btn-upload-bg-image");
+const bgImageFilename = document.getElementById("bg-image-filename");
+const bgImageId = document.getElementById("bg-image-id");
+
+if (btnUploadBgImage && bgImageFile) {
+  btnUploadBgImage.addEventListener("click", () => bgImageFile.click());
+  bgImageFile.addEventListener("change", async () => {
+    if (!bgImageFile.files.length) return;
+    const file = bgImageFile.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+    btnUploadBgImage.textContent = "Uploading...";
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      bgImageId.value = data.id;
+      bgImageFilename.textContent = data.filename;
+      btnUploadBgImage.textContent = "Change Image";
+    } catch (e) {
+      alert("Failed to upload background image: " + e.message);
+      btnUploadBgImage.textContent = "Choose Background Image";
+    }
+  });
+}
+
+// Background music upload
+const bgmFile = document.getElementById("bgm-file");
+const btnUploadBgm = document.getElementById("btn-upload-bgm");
+const bgmFilename = document.getElementById("bgm-filename");
+const bgmId = document.getElementById("bgm-id");
+
+if (btnUploadBgm && bgmFile) {
+  btnUploadBgm.addEventListener("click", () => bgmFile.click());
+  bgmFile.addEventListener("change", async () => {
+    if (!bgmFile.files.length) return;
+    const file = bgmFile.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+    btnUploadBgm.textContent = "Uploading...";
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      bgmId.value = data.id;
+      bgmFilename.textContent = data.filename;
+      btnUploadBgm.textContent = "Change Audio";
+    } catch (e) {
+      alert("Failed to upload music: " + e.message);
+      btnUploadBgm.textContent = "Choose Audio Track";
+    }
+  });
+}
+
+function getFormConfig() {
+  const [width, height] = (document.getElementById("resolution-preset").value || "1920x1080")
+    .split("x")
+    .map(n => parseInt(n, 10));
+
+  return {
+    title: (document.getElementById("video-title").value || "TOP RANKING").trim(),
+    width: width || 1920,
+    height: height || 1080,
+    accent: (document.getElementById("accent-color").value || "yellow").trim(),
+    bg_color: (document.getElementById("bg-color").value || "0x141414").trim(),
+    bg_image: bgImageId && bgImageId.value ? bgImageId.value : null,
+    bgm: bgmId && bgmId.value ? bgmId.value : null,
+    bgm_volume: parseFloat(document.getElementById("bgm-volume")?.value || 0.25),
+    clip_volume: parseFloat(document.getElementById("clip-volume")?.value || 1.0),
+    intro_seconds: 3.0,
+    clip_seconds: 8.0,
+    font: null,
+    items: getItemsData(),
+  };
+}
+
 if (btnAddItem) {
   btnAddItem.addEventListener("click", () => {
     addItem();
@@ -105,3 +183,5 @@ if (itemsContainer && itemsContainer.children.length === 0) {
 window.addItem = addItem;
 window.getItemsData = getItemsData;
 window.recalcRanks = recalcRanks;
+window.getFormConfig = getFormConfig;
+

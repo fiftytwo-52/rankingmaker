@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 5, Step 5.3 (Upload controls for background image and background music with volume input).
+- **Next step:** Phase 5, Step 5.4 (Wire Generate button to post job, poll progress, and show progress bar).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.
