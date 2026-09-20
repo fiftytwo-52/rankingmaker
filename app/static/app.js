@@ -167,6 +167,142 @@ function getFormConfig() {
   };
 }
 
+// Job execution & polling
+let currentJobId = null;
+let pollTimer = null;
+
+const btnGenerate = document.getElementById("btn-generate");
+const btnCancelJob = document.getElementById("btn-cancel-job");
+const jobStatusSection = document.getElementById("job-status-section");
+const jobStatusBadge = document.getElementById("job-status-badge");
+const jobProgressBar = document.getElementById("job-progress-bar");
+const jobProgressText = document.getElementById("job-progress-text");
+const jobErrorMsg = document.getElementById("job-error-msg");
+const jobResultSection = document.getElementById("job-result-section");
+const videoPreview = document.getElementById("video-preview");
+const downloadLink = document.getElementById("download-link");
+
+async function startJob() {
+  const cfg = getFormConfig();
+  if (!cfg.items || cfg.items.length === 0) {
+    alert("Please add at least 1 item to generate a video.");
+    return;
+  }
+
+  // Validate items
+  for (let i = 0; i < cfg.items.length; i++) {
+    const item = cfg.items[i];
+    if (!item.title) {
+      alert(`Item #${item.rank || i + 1} is missing a title.`);
+      return;
+    }
+    if (!item.source) {
+      alert(`Item #${item.rank || i + 1} is missing a source URL or uploaded clip.`);
+      return;
+    }
+    if (item.end !== null && item.end <= item.start) {
+      alert(`Item #${item.rank}: end time (${item.end}s) must be greater than start time (${item.start}s).`);
+      return;
+    }
+  }
+
+  // UI state setup
+  btnGenerate.disabled = true;
+  jobStatusSection.style.display = "block";
+  jobStatusBadge.textContent = "QUEUED";
+  jobStatusBadge.style.color = "#007bff";
+  jobProgressBar.value = 0;
+  jobProgressText.textContent = "Submitting job...";
+  jobErrorMsg.style.display = "none";
+  jobResultSection.style.display = "none";
+  videoPreview.pause();
+  videoPreview.removeAttribute("src");
+
+  try {
+    const res = await fetch("/api/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail ? JSON.stringify(err.detail) : "Failed to start job");
+    }
+
+    const data = await res.json();
+    currentJobId = data.job_id;
+    jobProgressText.textContent = "Job started. Rendering...";
+
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => pollJob(currentJobId), 1000);
+    pollJob(currentJobId);
+  } catch (e) {
+    btnGenerate.disabled = false;
+    jobStatusBadge.textContent = "FAILED";
+    jobStatusBadge.style.color = "#dc3545";
+    jobErrorMsg.textContent = e.message;
+    jobErrorMsg.style.display = "block";
+  }
+}
+
+async function pollJob(jobId) {
+  try {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    jobStatusBadge.textContent = data.status.toUpperCase();
+    jobProgressBar.value = data.progress || 0;
+    jobProgressText.textContent = `[${data.progress}%] ${data.message || ""}`;
+
+    if (data.status === "running") {
+      jobStatusBadge.style.color = "#ffc107";
+    } else if (data.status === "done") {
+      clearInterval(pollTimer);
+      btnGenerate.disabled = false;
+      jobStatusBadge.style.color = "#28a745";
+      jobProgressText.textContent = "Finished! Video ready to preview and download.";
+
+      const downloadUrl = `/api/jobs/${jobId}/download`;
+      downloadLink.href = downloadUrl;
+      videoPreview.src = downloadUrl;
+      jobResultSection.style.display = "block";
+    } else if (data.status === "failed") {
+      clearInterval(pollTimer);
+      btnGenerate.disabled = false;
+      jobStatusBadge.style.color = "#dc3545";
+      jobErrorMsg.textContent = data.error || data.message || "Unknown error occurred";
+      jobErrorMsg.style.display = "block";
+    } else if (data.status === "cancelled") {
+      clearInterval(pollTimer);
+      btnGenerate.disabled = false;
+      jobStatusBadge.style.color = "#6c757d";
+      jobProgressText.textContent = "Job was cancelled.";
+    }
+  } catch (e) {
+    console.error("Polling error:", e);
+  }
+}
+
+async function cancelCurrentJob() {
+  if (!currentJobId) return;
+  btnCancelJob.disabled = true;
+  try {
+    await fetch(`/api/jobs/${currentJobId}/cancel`, { method: "POST" });
+  } finally {
+    btnCancelJob.disabled = false;
+  }
+}
+
+if (btnGenerate) {
+  btnGenerate.addEventListener("click", startJob);
+}
+
+if (btnCancelJob) {
+  btnCancelJob.addEventListener("click", cancelCurrentJob);
+}
+
 if (btnAddItem) {
   btnAddItem.addEventListener("click", () => {
     addItem();
@@ -184,4 +320,8 @@ window.addItem = addItem;
 window.getItemsData = getItemsData;
 window.recalcRanks = recalcRanks;
 window.getFormConfig = getFormConfig;
+window.startJob = startJob;
+window.pollJob = pollJob;
+window.cancelCurrentJob = cancelCurrentJob;
+
 
