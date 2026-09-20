@@ -1,0 +1,19 @@
+{
+  "title": "TOP 3 TEST RANKING",
+  "width": 1920,
+  "height": 1080,
+  "accent": "yellow",
+  "bg_color": "0x141414",
+  "bg_image": null,
+  "bgm": null,
+  "bgm_volume": 0.25,
+  "clip_volume": 1.0,
+  "intro_seconds": 3,
+  "clip_seconds": 8,
+  "font": null,
+  "items": [
+    { "rank": 3, "title": "Sample Item Three", "source": "test3.mp4", "start": 0, "end": 4 },
+    { "rank": 2, "title": "Sample Item Two", "source": "test2.mp4", "start": 0, "end": 4 },
+    { "rank": 1, "title": "Sample Item One", "source": "test1.mp4", "start": 0, "end": 4 }
+  ]
+}

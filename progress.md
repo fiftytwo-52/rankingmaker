@@ -1,0 +1,60 @@
+# Progress Tracking
+
+## Phase 0: Project setup and tracking files
+- [x] **0.1** Create the folder structure from section 3 (empty placeholder files are fine), plus `requirements.txt` (`fastapi`, `uvicorn[standard]`, `python-multipart`, `pydantic`, `yt-dlp`).
+  - *2026-09-20 14:58*: Created project directory layout, virtual environment (.venv), .gitignore, requirements.txt with pinned/standard packages, placeholder files, and installed dependencies successfully. Touched: `.gitignore`, `requirements.txt`, `app/main.py`, `app/models.py`, `app/engine.py`, `app/jobs.py`, `app/deps.py`, `app/static/index.html`, `app/static/app.js`, `tests/sample_config.json`.
+- [x] **0.2** Create `progress.md` with every step of this plan as an unchecked checklist, and `memory.md` with the section headings from rule 2.
+  - *2026-09-20 14:58*: Created progress.md with all phases/steps and memory.md with required sections. Touched: `progress.md`, `memory.md`.
+- [ ] **0.3** Create `README.md` (draft) and `docs/APP_DOCUMENTATION.md` (skeleton with headings only).
+- [ ] **0.4** Put a free bold `.ttf` font (e.g. DejaVu Sans Bold or Roboto Bold) in `data/fonts/default.ttf`. If you cannot download one, record in `memory.md` that the user must supply a font, and make the app fall back to a font path found on the system.
+
+## Phase 1: Server skeleton and dependency check
+- [ ] **1.1** `app/main.py`: FastAPI app with `GET /` serving a placeholder `index.html` ("Ranking Video Maker").
+- [ ] **1.2** `app/deps.py` + `GET /api/health`: detect `ffmpeg`, `ffprobe`, `yt-dlp` on PATH and return versions (or a clear "missing" message).
+- [ ] **1.3** Record the run command and environment info in `README.md` and `memory.md`.
+
+## Phase 2: Video engine (no web involved yet)
+- [ ] **2.1** `get_source(source, downloads_dir, uploads_dir)`: returns a local file path for a URL (download via yt-dlp with hash cache) or an uploaded file id.
+- [ ] **2.2** `has_audio(path)` and `probe_duration(path)` using ffprobe.
+- [ ] **2.3** `build_intro(cfg, work_dir)`: produces `seg_intro.mp4`.
+- [ ] **2.4** `build_item(cfg, item, idx, work_dir)`: produces one item segment per section 4.
+- [ ] **2.5** `concat_segments(segments, work_dir)`: joins them with the concat demuxer.
+- [ ] **2.6** `add_bgm(joined, bgm, volume, output)`: mixes the looped music.
+- [ ] **2.7** `render(cfg, job_dir, progress_callback, cancel_flag)`: orchestrates everything, sorts items in countdown order, calls `progress_callback(percent, message)` after each stage, and checks `cancel_flag` between stages.
+- [ ] **2.8** Update `docs/APP_DOCUMENTATION.md` with the pipeline section.
+
+## Phase 3: Config validation
+- [ ] **3.1** `app/models.py`: pydantic models for the config (section 5) with the validation rules.
+- [ ] **3.2** Make `render()` accept the validated model.
+
+## Phase 4: Jobs and API
+- [ ] **4.1** `app/jobs.py`: job manager that creates `jobs/<id>/`, runs `render()` in a background thread, tracks status/progress/error, and writes `job.json`.
+- [ ] **4.2** `POST /api/jobs` and `GET /api/jobs/{id}`.
+- [ ] **4.3** `GET /api/jobs/{id}/download`.
+- [ ] **4.4** `POST /api/jobs/{id}/cancel`.
+- [ ] **4.5** `POST /api/upload` storing files in `data/uploads/` with a generated id.
+- [ ] **4.6** Update `docs/APP_DOCUMENTATION.md` with the API section (with example requests).
+
+## Phase 5: Minimal frontend (functional only)
+- [ ] **5.1** The form for the main title, width/height preset (1920x1080 or 1080x1920), accent color, and a Generate button (not wired yet).
+- [ ] **5.2** Item list: "Add item" and "Remove" buttons; each item has rank, title, source (URL text box or file upload button), start, and end (seconds). Rank auto-fills descending (N, N-1, …).
+- [ ] **5.3** Upload controls for background image and background music, with a volume input for the music. Each upload calls `/api/upload` and shows the filename.
+- [ ] **5.4** Wire the Generate button: build the config, `POST /api/jobs`, then poll `/api/jobs/{id}` every second and show status text + a `<progress>` bar.
+- [ ] **5.5** On `done`, show a download link (and a `<video controls>` preview); on `failed`, show the error message; add a Cancel button.
+
+## Phase 6: Reliability
+- [ ] **6.1** Clear error messages for: missing tools, failed download (private/unavailable video), invalid start/end, unsupported file, ffmpeg failure (show the last lines of ffmpeg stderr in the job error).
+- [ ] **6.2** Cleanup: remove a job's intermediate `seg_*.mp4` files after success; keep `output.mp4`. Add a simple "Delete job" button or endpoint.
+- [ ] **6.3** Save the last-used form values in the browser's `localStorage` so a refresh doesn't lose the form.
+
+## Phase 7: Finish (still no beautification)
+- [ ] **7.1** End-to-end manual test with 5 items (mix of URLs and uploaded clips), a background image, and BGM. Record results in `progress.md`.
+- [ ] **7.2** Finalize `README.md` (install, run, use, troubleshooting) and `docs/APP_DOCUMENTATION.md`.
+- [ ] **7.3** Final update of `memory.md`: current status = "functional version complete, ready for polish phase", plus a list of known issues.
+
+## Later / polish ideas
+- Visual styling and themes
+- Animated title transitions
+- Sound effects on countdown reveals
+- Live layout preview in web canvas
+- Mobile-friendly responsive adjustments
