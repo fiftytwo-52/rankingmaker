@@ -63,3 +63,59 @@ def get_source(source: str, downloads_dir: Path | str, uploads_dir: Path | str) 
         return upload_matches[0].resolve()
 
     raise FileNotFoundError(f"Source file or upload ID not found: {source_str}")
+
+
+def has_audio(path: Path | str) -> bool:
+    """
+    Checks if a media file has at least one audio stream using ffprobe.
+    """
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "a",
+        "-show_entries", "stream=codec_type",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        return False
+    return "audio" in res.stdout.lower()
+
+
+def probe_duration(path: Path | str) -> float:
+    """
+    Returns the duration in seconds of a media file using ffprobe.
+    """
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode == 0 and res.stdout.strip():
+        try:
+            return float(res.stdout.strip())
+        except ValueError:
+            pass
+
+    # Fallback to stream duration
+    cmd_stream = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    res2 = subprocess.run(cmd_stream, capture_output=True, text=True)
+    if res2.returncode == 0 and res2.stdout.strip():
+        try:
+            return float(res2.stdout.strip())
+        except ValueError:
+            pass
+
+    return 0.0
+
