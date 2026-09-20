@@ -5,7 +5,8 @@
   - *2026-09-20 14:58*: Created project directory layout, virtual environment (.venv), .gitignore, requirements.txt with pinned/standard packages, placeholder files, and installed dependencies successfully. Touched: `.gitignore`, `requirements.txt`, `app/main.py`, `app/models.py`, `app/engine.py`, `app/jobs.py`, `app/deps.py`, `app/static/index.html`, `app/static/app.js`, `tests/sample_config.json`.
 - [x] **0.2** Create `progress.md` with every step of this plan as an unchecked checklist, and `memory.md` with the section headings from rule 2.
   - *2026-09-20 14:58*: Created progress.md with all phases/steps and memory.md with required sections. Touched: `progress.md`, `memory.md`.
-- [ ] **0.3** Create `README.md` (draft) and `docs/APP_DOCUMENTATION.md` (skeleton with headings only).
+- [x] **0.3** Create `README.md` (draft) and `docs/APP_DOCUMENTATION.md` (skeleton with headings only).
+  - *2026-09-20 14:59*: Created README.md with overview, requirements, run steps, and docs/APP_DOCUMENTATION.md skeleton with all structural headings. Touched: `README.md`, `docs/APP_DOCUMENTATION.md`.
 - [ ] **0.4** Put a free bold `.ttf` font (e.g. DejaVu Sans Bold or Roboto Bold) in `data/fonts/default.ttf`. If you cannot download one, record in `memory.md` that the user must supply a font, and make the app fall back to a font path found on the system.
 
 ## Phase 1: Server skeleton and dependency check

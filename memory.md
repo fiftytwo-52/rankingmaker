@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 0, Step 0.3 (Create README.md draft and docs/APP_DOCUMENTATION.md skeleton).
+- **Next step:** Phase 0, Step 0.4 (Place a free bold .ttf font in data/fonts/default.ttf).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.
