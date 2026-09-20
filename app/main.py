@@ -35,6 +35,23 @@ def get_job_endpoint(id: str):
     return job.to_dict()
 
 
+@app.get("/api/jobs/{id}/download")
+def download_job_output(id: str):
+    job = job_manager.get_job(id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    output_path = Path(job.output_file) if job.output_file else BASE_DIR / "jobs" / id / "output.mp4"
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Output file not found or not ready")
+
+    return FileResponse(
+        path=output_path,
+        media_type="video/mp4",
+        filename=f"ranking_{id}.mp4",
+    )
+
+
 @app.get("/")
 def read_root():
     return FileResponse(STATIC_DIR / "index.html")
