@@ -60,6 +60,9 @@ def main():
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
+    from app.models import VideoConfig
+    validated_cfg = VideoConfig(**cfg)
+
     job_dir = base_dir / "jobs" / "sample_run"
 
     progress_log = []
@@ -67,7 +70,7 @@ def main():
         print(f"[{pct:3d}%] {msg}")
         progress_log.append((pct, msg))
 
-    output = render(cfg, job_dir=job_dir, progress_callback=on_progress, base_data_dir=base_dir / "data")
+    output = render(validated_cfg, job_dir=job_dir, progress_callback=on_progress, base_data_dir=base_dir / "data")
     print(f"Render completed: {output}")
     assert output.exists(), f"Output file does not exist at {output}"
 

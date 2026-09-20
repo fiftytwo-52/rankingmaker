@@ -39,7 +39,8 @@
 ## Phase 3: Config validation
 - [x] **3.1** `app/models.py`: pydantic models for the config (section 5) with the validation rules.
   - *2026-09-20 15:10*: Implemented `VideoConfig`, `ItemConfig`, and `JobState` Pydantic models. Verified validation rules for minimum 1 item, unique ranks, and end > start constraints. Touched: `app/models.py`.
-- [ ] **3.2** Make `render()` accept the validated model.
+- [x] **3.2** Make `render()` accept the validated model.
+  - *2026-09-20 15:11*: Adapted `render`, `build_intro`, and `build_item` to directly accept either Pydantic models (`VideoConfig`, `ItemConfig`) or dicts. Verified with `python -m tests.run_sample` passing full validated model. Touched: `app/engine.py`, `tests/run_sample.py`.
 
 ## Phase 4: Jobs and API
 - [ ] **4.1** `app/jobs.py`: job manager that creates `jobs/<id>/`, runs `render()` in a background thread, tracks status/progress/error, and writes `job.json`.

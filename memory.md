@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 3, Step 3.2 (Make `render()` accept the validated model).
+- **Next step:** Phase 4, Step 4.1 (`app/jobs.py`: job manager with background thread, job.json mirror).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.

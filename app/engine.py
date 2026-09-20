@@ -164,10 +164,17 @@ def prepare_font(cfg: dict, work_dir: Path, fonts_dir: Path, uploads_dir: Path) 
     return dest_font
 
 
-def build_intro(cfg: dict, work_dir: Path | str, base_data_dir: Path | str = "data") -> Path:
+def build_intro(cfg: dict | Any, work_dir: Path | str, base_data_dir: Path | str = "data") -> Path:
     """
     Produces seg_intro.mp4 in work_dir with background and centered title.
     """
+    if hasattr(cfg, "model_dump"):
+        cfg = cfg.model_dump()
+    elif hasattr(cfg, "dict"):
+        cfg = cfg.dict()
+    else:
+        cfg = dict(cfg)
+
     work_dir = Path(work_dir).resolve()
     work_dir.mkdir(parents=True, exist_ok=True)
     base_data_dir = Path(base_data_dir).resolve()
@@ -241,8 +248,8 @@ def build_intro(cfg: dict, work_dir: Path | str, base_data_dir: Path | str = "da
 
 
 def build_item(
-    cfg: dict,
-    item: dict,
+    cfg: dict | Any,
+    item: dict | Any,
     idx: int,
     work_dir: Path | str,
     base_data_dir: Path | str = "data",
@@ -250,6 +257,20 @@ def build_item(
     """
     Produces seg_{idx}.mp4 for one ranked item according to layout specs.
     """
+    if hasattr(cfg, "model_dump"):
+        cfg = cfg.model_dump()
+    elif hasattr(cfg, "dict"):
+        cfg = cfg.dict()
+    else:
+        cfg = dict(cfg)
+
+    if hasattr(item, "model_dump"):
+        item = item.model_dump()
+    elif hasattr(item, "dict"):
+        item = item.dict()
+    else:
+        item = dict(item)
+
     work_dir = Path(work_dir).resolve()
     work_dir.mkdir(parents=True, exist_ok=True)
     base_data_dir = Path(base_data_dir).resolve()
