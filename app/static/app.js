@@ -27,6 +27,7 @@ function createItemRow(rank = 1, title = "", source = "", start = 0, end = 8) {
   row.querySelector(".btn-remove-item").addEventListener("click", () => {
     row.remove();
     recalcRanks();
+    saveFormState();
   });
 
   // Wire clip upload
@@ -47,6 +48,7 @@ function createItemRow(rank = 1, title = "", source = "", start = 0, end = 8) {
       const data = await res.json();
       sourceInput.value = data.id;
       uploadBtn.textContent = "Uploaded!";
+      saveFormState();
       setTimeout(() => { uploadBtn.textContent = "Upload Clip"; }, 2000);
     } catch (e) {
       alert("Error uploading clip: " + e.message);
@@ -75,14 +77,14 @@ function addItem(title = "", source = "", start = 0, end = 8) {
 }
 
 function getItemsData() {
-  const rows = itemsContainer.querySelectorAll(".item-row");
+  const rows = itemsContainer ? itemsContainer.querySelectorAll(".item-row") : [];
   const items = [];
   rows.forEach(row => {
-    const rank = parseInt(row.querySelector(".item-rank").value, 10) || 0;
-    const title = row.querySelector(".item-title").value.trim();
-    const source = row.querySelector(".item-source").value.trim();
-    const start = parseFloat(row.querySelector(".item-start").value) || 0;
-    const endVal = row.querySelector(".item-end").value.trim();
+    const rank = parseInt(row.querySelector(".item-rank")?.value, 10) || 0;
+    const title = String(row.querySelector(".item-title")?.value || "").trim();
+    const source = String(row.querySelector(".item-source")?.value || "").trim();
+    const start = parseFloat(row.querySelector(".item-start")?.value) || 0;
+    const endVal = String(row.querySelector(".item-end")?.value || "").trim();
     const end = endVal !== "" ? parseFloat(endVal) : null;
     items.push({ rank, title, source, start, end });
   });
@@ -110,6 +112,7 @@ if (btnUploadBgImage && bgImageFile) {
       bgImageId.value = data.id;
       bgImageFilename.textContent = data.filename;
       btnUploadBgImage.textContent = "Change Image";
+      saveFormState();
     } catch (e) {
       alert("Failed to upload background image: " + e.message);
       btnUploadBgImage.textContent = "Choose Background Image";
@@ -138,6 +141,7 @@ if (btnUploadBgm && bgmFile) {
       bgmId.value = data.id;
       bgmFilename.textContent = data.filename;
       btnUploadBgm.textContent = "Change Audio";
+      saveFormState();
     } catch (e) {
       alert("Failed to upload music: " + e.message);
       btnUploadBgm.textContent = "Choose Audio Track";
@@ -317,18 +321,110 @@ if (btnGenerate) {
   btnGenerate.addEventListener("click", startJob);
 }
 
+if (btnAddItem) {
+  btnAddItem.addEventListener("click", () => {
+    addItem();
+    saveFormState();
+  });
+}
+
 if (btnCancelJob) {
   btnCancelJob.addEventListener("click", cancelCurrentJob);
 }
 
-if (btnAddItem) {
-  btnAddItem.addEventListener("click", () => {
-    addItem();
-  });
+const STORAGE_KEY = "ranking_video_form_state";
+
+function saveFormState() {
+  try {
+    const state = {
+      title: document.getElementById("video-title")?.value || "",
+      resolution: document.getElementById("resolution-preset")?.value || "1920x1080",
+      accent: document.getElementById("accent-color")?.value || "yellow",
+      bg_color: document.getElementById("bg-color")?.value || "0x141414",
+      bg_image_id: bgImageId?.value || "",
+      bg_image_name: bgImageFilename?.textContent || "",
+      bgm_id: bgmId?.value || "",
+      bgm_name: bgmFilename?.textContent || "",
+      bgm_volume: document.getElementById("bgm-volume")?.value || "0.25",
+      clip_volume: document.getElementById("clip-volume")?.value || "1.0",
+      items: getItemsData(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn("Could not save form state to localStorage:", e);
+  }
 }
 
-// Default initial items
-if (itemsContainer && itemsContainer.children.length === 0) {
+function loadFormState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (!state) return false;
+
+    if (state.title !== undefined && document.getElementById("video-title")) {
+      document.getElementById("video-title").value = state.title;
+    }
+    if (state.resolution && document.getElementById("resolution-preset")) {
+      document.getElementById("resolution-preset").value = state.resolution;
+    }
+    if (state.accent && document.getElementById("accent-color")) {
+      document.getElementById("accent-color").value = state.accent;
+    }
+    if (state.bg_color && document.getElementById("bg-color")) {
+      document.getElementById("bg-color").value = state.bg_color;
+    }
+    if (state.bg_image_id && bgImageId) {
+      bgImageId.value = state.bg_image_id;
+      if (bgImageFilename && state.bg_image_name) {
+        bgImageFilename.textContent = state.bg_image_name;
+      }
+      if (btnUploadBgImage) btnUploadBgImage.textContent = "Change Image";
+    }
+    if (state.bgm_id && bgmId) {
+      bgmId.value = state.bgm_id;
+      if (bgmFilename && state.bgm_name) {
+        bgmFilename.textContent = state.bgm_name;
+      }
+      if (btnUploadBgm) btnUploadBgm.textContent = "Change Audio";
+    }
+    if (state.bgm_volume !== undefined && document.getElementById("bgm-volume")) {
+      document.getElementById("bgm-volume").value = state.bgm_volume;
+    }
+    if (state.clip_volume !== undefined && document.getElementById("clip-volume")) {
+      document.getElementById("clip-volume").value = state.clip_volume;
+    }
+
+    if (Array.isArray(state.items) && state.items.length > 0 && itemsContainer) {
+      itemsContainer.innerHTML = "";
+      state.items.forEach(it => {
+        addItem(it.title || "", it.source || "", it.start || 0, it.end !== null ? it.end : 8);
+      });
+      // Restore explicit ranks if custom
+      const rows = itemsContainer.querySelectorAll(".item-row");
+      rows.forEach((row, idx) => {
+        if (state.items[idx]?.rank !== undefined) {
+          row.querySelector(".item-rank").value = state.items[idx].rank;
+        }
+      });
+      return true;
+    }
+  } catch (e) {
+    console.warn("Could not load form state from localStorage:", e);
+  }
+  return false;
+}
+
+// Auto-save on form edits
+const videoForm = document.getElementById("video-form");
+if (videoForm) {
+  videoForm.addEventListener("input", saveFormState);
+  videoForm.addEventListener("change", saveFormState);
+}
+
+// Initial state load
+const loaded = loadFormState();
+if (!loaded && itemsContainer && itemsContainer.children.length === 0) {
   addItem("Clip 2", "", 0, 8);
   addItem("Clip 1", "", 0, 8);
 }
@@ -341,5 +437,8 @@ window.getFormConfig = getFormConfig;
 window.startJob = startJob;
 window.pollJob = pollJob;
 window.cancelCurrentJob = cancelCurrentJob;
+window.saveFormState = saveFormState;
+window.loadFormState = loadFormState;
+
 
 

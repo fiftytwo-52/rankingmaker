@@ -80,7 +80,8 @@
   - *2026-09-20 15:26*: Implemented formatted error messages with stderr line trimming for FFmpeg and yt-dlp, model validation for timestamps, and file resolution guards. Verified all 5 failure cases produce readable messages in API and UI. Touched: `app/engine.py`, `app/models.py`.
 - [x] **6.2** Cleanup: remove a job's intermediate `seg_*.mp4` files after success; keep `output.mp4`. Add a simple "Delete job" button or endpoint.
   - *2026-09-20 15:27*: Automated post-render cleanup of intermediate files (`work/` directory containing segment videos and text files), keeping only `output.mp4` and `job.json`. Added `DELETE /api/jobs/{id}` and UI "Delete Job" button. Touched: `app/engine.py`, `app/jobs.py`, `app/main.py`, `app/static/index.html`, `app/static/app.js`.
-- [ ] **6.3** Save the last-used form values in the browser's `localStorage` so a refresh doesn't lose the form.
+- [X] **6.3** Save the last-used form values in the browser's `localStorage` so a refresh doesn't lose the form.
+  - *2026-09-20 15:30*: Implemented `saveFormState()` and `loadFormState()` persisting title, preset resolution, accent/bg colors, bg image/music selections, volume sliders, and dynamic item list in `localStorage` under `ranking_video_form_state`. Automated test verified form restores identically across page loads. Touched: `app/static/app.js`.
 
 ## Phase 7: Finish (still no beautification)
 

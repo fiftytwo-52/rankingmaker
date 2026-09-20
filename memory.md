@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 6, Step 6.3 (Save last-used form values in browser localStorage).
+- **Next step:** Phase 7, Step 7.1 (End-to-end manual test with 5 items, background image, and BGM).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.
