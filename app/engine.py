@@ -22,6 +22,12 @@ def is_cancelled(cancel_flag) -> bool:
     return bool(cancel_flag)
 
 
+def format_ffmpeg_error(stderr: str, max_lines: int = 10) -> str:
+    """Extracts the last non-empty lines from FFmpeg/yt-dlp stderr for readability."""
+    lines = [line.strip() for line in (stderr or "").strip().split("\n") if line.strip()]
+    return "\n".join(lines[-max_lines:]) if lines else "No stderr output available"
+
+
 def run_subprocess_with_cancel(cmd: list[str], cwd: str | None = None, cancel_flag=None, **kwargs) -> subprocess.CompletedProcess:
     """
     Executes a subprocess command while monitoring cancel_flag.
@@ -95,7 +101,8 @@ def get_source(
             fallback_cmd = [sys.executable, "-m", "yt_dlp", "-f", "bv*[height<=1080]+ba/b", "--merge-output-format", "mp4", "-o", output_template, source_str]
             res2 = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
             if res2.returncode != 0:
-                raise RuntimeError(f"yt-dlp failed to download URL '{source_str}': {res2.stderr.strip() or res.stderr.strip()}")
+                clean_err = format_ffmpeg_error(res2.stderr or res.stderr)
+                raise RuntimeError(f"yt-dlp failed to download URL '{source_str}':\n{clean_err}")
 
         matches = [Path(p) for p in glob.glob(pattern) if not p.endswith(".part")]
         if not matches:
@@ -116,7 +123,7 @@ def get_source(
     if upload_matches:
         return upload_matches[0].resolve()
 
-    raise FileNotFoundError(f"Source file or upload ID not found: {source_str}")
+    raise FileNotFoundError(f"Source file or upload ID not found: '{source_str}'")
 
 
 def has_audio(path: Path | str) -> bool:
@@ -297,7 +304,7 @@ def build_intro(
 
     res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
-        raise RuntimeError(f"FFmpeg build_intro failed: {res.stderr.strip()}")
+        raise RuntimeError(f"FFmpeg build_intro failed:\n{format_ffmpeg_error(res.stderr)}")
 
     if not out_file.exists():
         raise FileNotFoundError(f"build_intro did not produce {out_file}")
@@ -452,7 +459,7 @@ def build_item(
 
     res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
-        raise RuntimeError(f"FFmpeg build_item failed for item #{rank}: {res.stderr.strip()}")
+        raise RuntimeError(f"FFmpeg build_item failed for item #{rank}:\n{format_ffmpeg_error(res.stderr)}")
 
     if not out_file.exists():
         raise FileNotFoundError(f"build_item did not produce {out_file}")
@@ -496,7 +503,7 @@ def concat_segments(
 
     res = run_subprocess_with_cancel(cmd, cwd=str(work_dir), cancel_flag=cancel_flag)
     if res.returncode != 0:
-        raise RuntimeError(f"FFmpeg concat_segments failed: {res.stderr.strip()}")
+        raise RuntimeError(f"FFmpeg concat_segments failed:\n{format_ffmpeg_error(res.stderr)}")
 
     if not out_file.exists():
         raise FileNotFoundError(f"concat_segments did not produce {out_file}")
@@ -566,7 +573,8 @@ def add_bgm(
         ]
         res_fb = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
         if res_fb.returncode != 0:
-            raise RuntimeError(f"FFmpeg add_bgm failed: {res.stderr.strip() or res_fb.stderr.strip()}")
+            clean_err = format_ffmpeg_error(res_fb.stderr or res.stderr)
+            raise RuntimeError(f"FFmpeg add_bgm failed:\n{clean_err}")
 
     if not output_path.exists():
         raise FileNotFoundError(f"add_bgm did not produce {output_path}")

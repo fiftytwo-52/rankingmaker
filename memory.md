@@ -1,7 +1,7 @@
 # Working Memory
 
 ## Current status
-- **Next step:** Phase 6, Step 6.1 (Clear error messages for edge cases: missing tools, failed download, invalid start/end, ffmpeg failure).
+- **Next step:** Phase 6, Step 6.2 (Cleanup intermediate segment files after success; add Delete job endpoint and button).
 
 ## Decisions made
 - Initialized a virtual environment at `.venv` to comply with Python 3.12 PEP 668 package isolation standards while using the required FastAPI / uvicorn / yt-dlp stack.

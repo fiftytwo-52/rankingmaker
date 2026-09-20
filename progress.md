@@ -76,7 +76,8 @@
 
 ## Phase 6: Reliability
 
-- [ ] **6.1** Clear error messages for: missing tools, failed download (private/unavailable video), invalid start/end, unsupported file, ffmpeg failure (show the last lines of ffmpeg stderr in the job error).
+- [x] **6.1** Clear error messages for: missing tools, failed download (private/unavailable video), invalid start/end, unsupported file, ffmpeg failure (show the last lines of ffmpeg stderr in the job error).
+  - *2026-09-20 15:26*: Implemented formatted error messages with stderr line trimming for FFmpeg and yt-dlp, model validation for timestamps, and file resolution guards. Verified all 5 failure cases produce readable messages in API and UI. Touched: `app/engine.py`, `app/models.py`.
 - [ ] **6.2** Cleanup: remove a job's intermediate `seg_*.mp4` files after success; keep `output.mp4`. Add a simple "Delete job" button or endpoint.
 - [ ] **6.3** Save the last-used form values in the browser's `localStorage` so a refresh doesn't lose the form.
 
