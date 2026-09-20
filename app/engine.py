@@ -379,4 +379,46 @@ def build_item(
     return out_file
 
 
+def concat_segments(segments: list[Path | str], work_dir: Path | str) -> Path:
+    """
+    Joins multiple identically encoded segments using the FFmpeg concat demuxer with stream copy (-c copy).
+    """
+    work_dir = Path(work_dir).resolve()
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    if not segments:
+        raise ValueError("No segments provided to concatenate")
+
+    list_file = work_dir / "concat_list.txt"
+    with open(list_file, "w", encoding="utf-8") as f:
+        for seg in segments:
+            seg_path = Path(seg).resolve()
+            # Write relative name if in work_dir or absolute if elsewhere
+            try:
+                rel_path = seg_path.relative_to(work_dir)
+                f.write(f"file '{rel_path.as_posix()}'\n")
+            except ValueError:
+                f.write(f"file '{seg_path.as_posix()}'\n")
+
+    out_file = work_dir / "joined.mp4"
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", list_file.name,
+        "-c", "copy",
+        str(out_file.name),
+    ]
+
+    res = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"FFmpeg concat_segments failed: {res.stderr.strip()}")
+
+    if not out_file.exists():
+        raise FileNotFoundError(f"concat_segments did not produce {out_file}")
+
+    return out_file
+
+
+
 
