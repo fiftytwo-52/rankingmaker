@@ -2,10 +2,11 @@
 
 A local web application that automatically generates "Top N" countdown/ranking videos with zero manual editing. Users enter a title and ranked items (from URLs or uploaded video clips), specify start/end timestamps, optionally add background visuals and music, and generate a polished, synchronized countdown MP4.
 
-## Requirements
-- **Python:** 3.10+ (tested with Python 3.12)
-- **FFmpeg & FFprobe:** Installed and available on system PATH
-- **yt-dlp:** Included in Python dependencies or system PATH
+## Requirements & Tested Environment
+- **OS:** Linux (Ubuntu 24.04 LTS / 6.8 kernel, x86_64)
+- **Python:** 3.10+ (tested with Python 3.12.3)
+- **FFmpeg & FFprobe:** Installed and available on system PATH (tested with FFmpeg 6.1.1-3ubuntu5)
+- **yt-dlp:** Included in Python dependencies or system PATH (tested with 2026.8.19)
 
 ## Installation
 

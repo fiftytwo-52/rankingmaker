@@ -15,7 +15,8 @@
   - *2026-09-20 15:00*: Configured FastAPI application with static files mount and FileResponse serving `index.html` at `GET /`. Verified server runs and returns 200 with page content. Touched: `app/main.py`.
 - [x] **1.2** `app/deps.py` + `GET /api/health`: detect `ffmpeg`, `ffprobe`, `yt-dlp` on PATH and return versions (or a clear "missing" message).
   - *2026-09-20 15:00*: Implemented dependency checking in `app/deps.py` and exposed `GET /api/health`. Verified health detection for ffmpeg, ffprobe, yt-dlp and verified clear missing message handling. Touched: `app/deps.py`, `app/main.py`.
-- [ ] **1.3** Record the run command and environment info in `README.md` and `memory.md`.
+- [x] **1.3** Record the run command and environment info in `README.md` and `memory.md`.
+  - *2026-09-20 15:01*: Verified and recorded verified OS, Python, FFmpeg, FFprobe, and yt-dlp versions along with run commands in `README.md` and `memory.md`. Touched: `README.md`, `memory.md`.
 
 ## Phase 2: Video engine (no web involved yet)
 - [ ] **2.1** `get_source(source, downloads_dir, uploads_dir)`: returns a local file path for a URL (download via yt-dlp with hash cache) or an uploaded file id.
