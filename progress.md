@@ -57,7 +57,8 @@
   - *2026-09-20 15:19*: Updated `docs/APP_DOCUMENTATION.md` with configuration schema, validation rules, and comprehensive API documentation with request/response examples for all 7 endpoints. Touched: `docs/APP_DOCUMENTATION.md`.
 
 ## Phase 5: Minimal frontend (functional only)
-- [ ] **5.1** The form for the main title, width/height preset (1920x1080 or 1080x1920), accent color, and a Generate button (not wired yet).
+- [x] **5.1** The form for the main title, width/height preset (1920x1080 or 1080x1920), accent color, and a Generate button (not wired yet).
+  - *2026-09-20 15:20*: Built functional form in `app/static/index.html` with title, resolution preset options (1920x1080 and 1080x1920), accent color, and generate button with clean readable spacing. Touched: `app/static/index.html`.
 - [ ] **5.2** Item list: "Add item" and "Remove" buttons; each item has rank, title, source (URL text box or file upload button), start, and end (seconds). Rank auto-fills descending (N, N-1, …).
 - [ ] **5.3** Upload controls for background image and background music, with a volume input for the music. Each upload calls `/api/upload` and shows the filename.
 - [ ] **5.4** Wire the Generate button: build the config, `POST /api/jobs`, then poll `/api/jobs/{id}` every second and show status text + a `<progress>` bar.
