@@ -53,7 +53,8 @@
   - *2026-09-20 15:17*: Implemented `POST /api/jobs/{id}/cancel` and integrated subprocess termination monitoring via `run_subprocess_with_cancel`. Tested cancelling active rendering job, immediately killing the FFmpeg process and setting status to `cancelled`. Touched: `app/main.py`, `app/engine.py`.
 - [x] **4.5** `POST /api/upload` storing files in `data/uploads/` with a generated id.
   - *2026-09-20 15:19*: Implemented `POST /api/upload` storing uploaded files in `data/uploads/` with UUID-based IDs and preserving file extensions. Tested uploading a clip, referencing its returned ID as an item `source` in a job, and rendering successfully. Touched: `app/main.py`.
-- [ ] **4.6** Update `docs/APP_DOCUMENTATION.md` with the API section (with example requests).
+- [x] **4.6** Update `docs/APP_DOCUMENTATION.md` with the API section (with example requests).
+  - *2026-09-20 15:19*: Updated `docs/APP_DOCUMENTATION.md` with configuration schema, validation rules, and comprehensive API documentation with request/response examples for all 7 endpoints. Touched: `docs/APP_DOCUMENTATION.md`.
 
 ## Phase 5: Minimal frontend (functional only)
 - [ ] **5.1** The form for the main title, width/height preset (1920x1080 or 1080x1920), accent color, and a Generate button (not wired yet).

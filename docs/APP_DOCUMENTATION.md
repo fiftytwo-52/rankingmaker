@@ -6,14 +6,135 @@
 
 ## 3. Configuration & Data Schema
 
+The request payload for rendering videos is validated using Pydantic models in `app/models.py`.
+
+```json
+{
+  "title": "TOP 5 FUNNIEST CAT FAILS",
+  "width": 1920,
+  "height": 1080,
+  "accent": "yellow",
+  "bg_color": "0x141414",
+  "bg_image": null,
+  "bgm": null,
+  "bgm_volume": 0.25,
+  "clip_volume": 1.0,
+  "intro_seconds": 3,
+  "clip_seconds": 8,
+  "font": null,
+  "items": [
+    { "rank": 5, "title": "Cucumber scare", "source": "https://www.youtube.com/watch?v=xyz", "start": 12, "end": 20 },
+    { "rank": 4, "title": "Missed jump", "source": "upload_file_id.mp4", "start": 0, "duration": 6 }
+  ]
+}
+```
+
+### Validation Rules
+- `title`: Non-empty string.
+- `width`, `height`: Positive integers (default: 1920x1080).
+- `items`: Minimum 1 item required. Ranks must be unique integers.
+- `start` / `end`: `start >= 0`. If `end` is specified, `end > start`.
+
+---
+
 ## 4. API Endpoints
+
 ### 4.1 GET /api/health
+Checks whether `ffmpeg`, `ffprobe`, and `yt-dlp` are installed and available on system PATH.
+
+**Response (200 OK):**
+```json
+{
+  "healthy": true,
+  "tools": {
+    "ffmpeg": {
+      "available": true,
+      "version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+      "error": null
+    },
+    "ffprobe": {
+      "available": true,
+      "version": "ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers",
+      "error": null
+    },
+    "yt_dlp": {
+      "available": true,
+      "version": "2026.8.19",
+      "error": null
+    }
+  }
+}
+```
+
 ### 4.2 POST /api/upload
+Uploads a media file (clip, background image, music track, or custom font) to `data/uploads/`.
+
+**Request:** `multipart/form-data` with key `file`.
+
+**Response (200 OK):**
+```json
+{
+  "id": "e832dfa941ab.mp4",
+  "filename": "my_video_clip.mp4"
+}
+```
+
 ### 4.3 POST /api/jobs
+Submits a video generation job to be rendered asynchronously in a background worker thread.
+
+**Request:** `application/json` (VideoConfig payload)
+
+**Response (200 OK):**
+```json
+{
+  "job_id": "71e8d4508720"
+}
+```
+
 ### 4.4 GET /api/jobs/{id}
+Polls the current status and rendering progress of a submitted job.
+
+**Response (200 OK):**
+```json
+{
+  "id": "71e8d4508720",
+  "status": "running",
+  "progress": 45,
+  "message": "Building segment for #2 (Curious Cat)...",
+  "error": null,
+  "output_file": null
+}
+```
+*When completed:*
+```json
+{
+  "id": "71e8d4508720",
+  "status": "done",
+  "progress": 100,
+  "message": "Completed",
+  "error": null,
+  "output_file": "/path/to/jobs/71e8d4508720/output.mp4"
+}
+```
+
 ### 4.5 POST /api/jobs/{id}/cancel
+Immediately halts rendering, terminates active FFmpeg / yt-dlp subprocesses, and sets job status to `cancelled`.
+
+**Response (200 OK):**
+```json
+{
+  "message": "Job cancelled",
+  "status": "cancelled"
+}
+```
+
 ### 4.6 GET /api/jobs/{id}/download
+Streams the completed MP4 video file.
+
+**Response:** `200 OK`, `Content-Type: video/mp4`, `Content-Disposition: attachment; filename="ranking_{id}.mp4"`.
+
 ### 4.7 GET /
+Serves the web application user interface (`app/static/index.html`).
 
 ## 5. Video Processing Pipeline
 
