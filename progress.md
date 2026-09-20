@@ -33,7 +33,8 @@
   - *2026-09-20 15:05*: Implemented `add_bgm` with infinite stream looping, volume scaling, and `amix=inputs=2:duration=first:normalize=0` with exact video duration trimming. Tested looping a 1s audio track over a 3s video with perfect 3.0s boundary termination. Touched: `app/engine.py`.
 - [x] **2.7** `render(cfg, job_dir, progress_callback, cancel_flag)`: orchestrates everything, sorts items in countdown order, calls `progress_callback(percent, message)` after each stage, and checks `cancel_flag` between stages.
   - *2026-09-20 15:06*: Implemented `render` orchestrator with cancellation support, progress reporting, and descending countdown order sorting. Verified end-to-end with `python -m tests.run_sample` building an 8.02s countdown video from 3 test clips. Touched: `app/engine.py`, `tests/run_sample.py`, `tests/sample_config.json`.
-- [ ] **2.8** Update `docs/APP_DOCUMENTATION.md` with the pipeline section.
+- [x] **2.8** Update `docs/APP_DOCUMENTATION.md` with the pipeline section.
+  - *2026-09-20 15:07*: Documented the video processing pipeline in `docs/APP_DOCUMENTATION.md` covering asset caching, probing, intro, item layout, concatenation, and BGM mixing. Touched: `docs/APP_DOCUMENTATION.md`.
 
 ## Phase 3: Config validation
 - [ ] **3.1** `app/models.py`: pydantic models for the config (section 5) with the validation rules.
