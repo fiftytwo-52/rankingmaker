@@ -34,6 +34,7 @@ function colorNameToHex(c) {
 const downloadedSources = new Map();
 const downloadingSet = new Set();
 const downloadFailedSet = new Set();
+const downloadErrors = new Map();
 let overlayElements = [];
 
 function updateItemRowStatus(row, srcVal) {
@@ -45,6 +46,9 @@ function updateItemRowStatus(row, srcVal) {
   if (!s) {
     statusEl.className = "item-status-pill status-empty";
     statusEl.textContent = "No Media";
+    statusEl.title = "No video source provided";
+    statusEl.style.cursor = "default";
+    statusEl.onclick = null;
     return;
   }
 
@@ -52,20 +56,42 @@ function updateItemRowStatus(row, srcVal) {
     if (downloadedSources.has(s)) {
       statusEl.className = "item-status-pill status-ready";
       statusEl.textContent = "Ready";
+      statusEl.title = "Source video downloaded and ready";
+      statusEl.style.cursor = "default";
+      statusEl.onclick = null;
     } else if (downloadingSet.has(s)) {
       statusEl.className = "item-status-pill status-downloading";
       statusEl.textContent = "Downloading...";
+      statusEl.title = "Downloading video from source URL...";
+      statusEl.style.cursor = "default";
+      statusEl.onclick = null;
     } else if (downloadFailedSet.has(s)) {
       statusEl.className = "item-status-pill status-error";
-      statusEl.textContent = "Failed";
+      statusEl.textContent = "Failed (Retry)";
+      const reason = downloadErrors.get(s) || "Download failed.";
+      statusEl.title = `${reason} Click to retry download.`;
+      statusEl.style.cursor = "pointer";
+      statusEl.onclick = (e) => {
+        e.stopPropagation();
+        preDownloadSource(s, true);
+      };
     } else {
-      statusEl.className = "item-status-pill status-downloading";
-      statusEl.textContent = "Downloading...";
+      statusEl.className = "item-status-pill status-pending";
+      statusEl.textContent = "Pending";
+      statusEl.title = "Click to download source now";
+      statusEl.style.cursor = "pointer";
+      statusEl.onclick = (e) => {
+        e.stopPropagation();
+        preDownloadSource(s, true);
+      };
     }
   } else {
     // Local upload or file
     statusEl.className = "item-status-pill status-ready";
     statusEl.textContent = "Ready";
+    statusEl.title = "Local media ready";
+    statusEl.style.cursor = "default";
+    statusEl.onclick = null;
   }
 }
 
@@ -81,14 +107,21 @@ function updateAllItemStatuses() {
   });
 }
 
-async function preDownloadSource(url) {
+async function preDownloadSource(url, force = false) {
   if (!url || typeof url !== "string") return;
   const trimmed = url.trim();
   if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return;
-  if (downloadedSources.has(trimmed) || downloadingSet.has(trimmed)) return;
+
+  if (force) {
+    downloadFailedSet.delete(trimmed);
+    downloadErrors.delete(trimmed);
+  }
+
+  if (downloadedSources.has(trimmed) || downloadingSet.has(trimmed) || downloadFailedSet.has(trimmed)) return;
 
   downloadingSet.add(trimmed);
   downloadFailedSet.delete(trimmed);
+  downloadErrors.delete(trimmed);
   updateAllItemStatuses();
   try {
     const res = await fetch("/api/download-source", {
@@ -100,13 +133,22 @@ async function preDownloadSource(url) {
       const data = await res.json();
       if (data && data.url) {
         downloadedSources.set(trimmed, data.url);
+        downloadFailedSet.delete(trimmed);
+        downloadErrors.delete(trimmed);
       }
     } else {
+      let errText = `Download failed (HTTP ${res.status})`;
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.detail) errText = errJson.detail;
+      } catch (_) {}
       downloadFailedSet.add(trimmed);
+      downloadErrors.set(trimmed, errText);
     }
   } catch (err) {
     console.warn("Failed to pre-download video:", err);
     downloadFailedSet.add(trimmed);
+    downloadErrors.set(trimmed, err.message || "Network error");
   } finally {
     downloadingSet.delete(trimmed);
     updateAllItemStatuses();
@@ -137,7 +179,7 @@ function updateRowThumb(row, srcVal) {
   if (s.startsWith("http://") || s.startsWith("https://")) {
     if (downloadedSources.has(s)) {
       resolved = downloadedSources.get(s);
-    } else {
+    } else if (!downloadingSet.has(s) && !downloadFailedSet.has(s)) {
       preDownloadSource(s);
     }
   } else if (s.startsWith("/uploads/") || s.startsWith("/downloads/")) {
@@ -307,26 +349,36 @@ function createItemRow(rank = 1, title = "", source = "", start = 0, end = 8, vo
   const sourceInput = row.querySelector(".item-source");
 
   if (sourceInput) {
+    let dlInputTimeout = null;
     sourceInput.addEventListener("input", () => {
+      const val = (sourceInput.value || "").trim();
       updateRowThumb(row, sourceInput.value);
       updateItemRowStatus(row, sourceInput.value);
       selectThisItemInPreview();
       updateLivePreview();
+      if ((val.startsWith("http://") || val.startsWith("https://")) && val.length > 10) {
+        clearTimeout(dlInputTimeout);
+        dlInputTimeout = setTimeout(() => {
+          preDownloadSource(val);
+        }, 800);
+      }
     });
     sourceInput.addEventListener("change", () => {
       const val = (sourceInput.value || "").trim();
+      clearTimeout(dlInputTimeout);
       updateRowThumb(row, val);
       updateItemRowStatus(row, val);
       if (val.startsWith("http://") || val.startsWith("https://")) {
-        preDownloadSource(val);
+        preDownloadSource(val, true);
       }
     });
     sourceInput.addEventListener("blur", () => {
       const val = (sourceInput.value || "").trim();
+      clearTimeout(dlInputTimeout);
       updateRowThumb(row, val);
       updateItemRowStatus(row, val);
       if (val.startsWith("http://") || val.startsWith("https://")) {
-        preDownloadSource(val);
+        preDownloadSource(val, true);
       }
     });
     if (source) {
@@ -885,15 +937,15 @@ async function pollJob(jobId) {
       if (jobProgressText) jobProgressText.textContent = "Finished! Ready to preview & download.";
 
       const downloadUrl = `/api/jobs/${jobId}/download`;
+      const streamUrl = `/api/jobs/${jobId}/video`;
       if (downloadLink) downloadLink.href = downloadUrl;
-      if (videoPreview) videoPreview.src = downloadUrl;
+      if (videoPreview) {
+        videoPreview.src = streamUrl;
+        videoPreview.load();
+      }
       if (jobResultSection) jobResultSection.style.display = "block";
 
-      // Auto cleanup downloaded source video cache
-      try {
-        fetch("/api/cleanup-downloads", { method: "POST" }).catch(() => {});
-        downloadedSources.clear();
-      } catch (err) {}
+      // Retain downloaded sources so user preview and item deck remain ready
     } else if (data.status === "failed") {
       clearInterval(pollTimer);
       if (btnGenerate) btnGenerate.disabled = false;
@@ -1481,7 +1533,7 @@ function updateLivePreview(forcedSegment = null) {
       if (s.startsWith("http://") || s.startsWith("https://")) {
         if (downloadedSources.has(s)) {
           resolvedVideoSrc = downloadedSources.get(s);
-        } else {
+        } else if (!downloadingSet.has(s) && !downloadFailedSet.has(s)) {
           preDownloadSource(s);
         }
       } else if (s.startsWith("/uploads/") || s.startsWith("/downloads/")) {

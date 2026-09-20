@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from typing import Any
+import urllib
 import urllib.parse
 import urllib.request
 
@@ -85,9 +86,12 @@ def get_source(
     if source_str.startswith("http://") or source_str.startswith("https://"):
         url_hash = hashlib.md5(source_str.encode("utf-8")).hexdigest()
 
-        # Check if already cached
+        # Check if already cached (must be non-empty and not a partial file)
         pattern = str(downloads_dir / f"{url_hash}.*")
-        matches = [Path(p) for p in glob.glob(pattern) if not p.endswith(".part")]
+        matches = [
+            Path(p) for p in glob.glob(pattern)
+            if not p.endswith(".part") and not p.endswith(".ytdl") and Path(p).is_file() and Path(p).stat().st_size > 0
+        ]
         if matches:
             return matches[0]
 
@@ -95,17 +99,37 @@ def get_source(
         # (app.deps.get_yt_dlp_command) so a stale distro binary on PATH is never used.
         yt_dlp_base = get_yt_dlp_command()
         output_template = str(downloads_dir / f"{url_hash}.%(ext)s")
+
+        extra_flags = [
+            "--no-playlist",
+            "--socket-timeout", "30",
+        ]
+        # Browser impersonation via curl_cffi handles TikTok, Instagram, etc.
+        try:
+            import curl_cffi  # noqa: F401
+            extra_flags.extend(["--impersonate", "chrome"])
+        except ImportError:
+            pass
+
+        # JS runtime for YouTube signature challenges
+        node_path = shutil.which("node") or shutil.which("nodejs")
+        if node_path:
+            extra_flags.extend(["--js-runtimes", f"node:{node_path}"])
+
         cmd = yt_dlp_base + [
             "-f", "bv*[height<=1080]+ba/b[height<=1080]/best",
             "--merge-output-format", "mp4",
             "-o", output_template,
-            source_str,
-        ]
+        ] + extra_flags + [source_str]
         res = run_subprocess_with_cancel(cmd, cancel_flag=cancel_flag)
         if res.returncode != 0:
             # Retry with the same tool but a looser format selector: dropping the 1080p cap on
             # the plain-stream fallback covers videos that only expose one progressive stream.
-            fallback_cmd = yt_dlp_base + ["-f", "bv*[height<=1080]+ba/b/best", "--merge-output-format", "mp4", "-o", output_template, source_str]
+            fallback_cmd = yt_dlp_base + [
+                "-f", "bv*[height<=1080]+ba/b/best",
+                "--merge-output-format", "mp4",
+                "-o", output_template,
+            ] + extra_flags + [source_str]
             res2 = run_subprocess_with_cancel(fallback_cmd, cancel_flag=cancel_flag)
             if res2.returncode != 0:
                 # If both yt-dlp calls fail, check if it's a direct file download
@@ -126,7 +150,10 @@ def get_source(
                     clean_err = format_ffmpeg_error(res.stderr or res2.stderr)
                     raise RuntimeError(f"yt-dlp failed to download URL '{source_str}':\n{clean_err}")
 
-        matches = [Path(p) for p in glob.glob(pattern) if not p.endswith(".part")]
+        matches = [
+            Path(p) for p in glob.glob(pattern)
+            if not p.endswith(".part") and not p.endswith(".ytdl") and Path(p).is_file() and Path(p).stat().st_size > 0
+        ]
         if not matches:
             raise FileNotFoundError(f"Downloaded file for URL not found at {pattern}")
         return matches[0]
@@ -742,6 +769,9 @@ def build_intro(
             position=str(cfg.get("rank_ladder_position", "left")),
         )
         ladder_ass_file = work_dir / "intro_ladder.ass"
+        ladder_ass_file.write_text(ladder_ass_content, encoding="utf-8")
+        ladder_filter = f",ass={ladder_ass_file.name}:fontsdir=."
+
     filter_chains = []
     input_args = []
     if bg_image_id:
@@ -779,8 +809,9 @@ def build_intro(
         "-map", f"[{final_v}]",
         "-map", "1:a",
         "-t", str(intro_seconds),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-r", "30",
         "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        "-movflags", "+faststart",
         str(out_file),
     ]
 
@@ -1063,8 +1094,9 @@ def build_item(
         "-map", f"[{final_v}]",
         "-map", audio_map[0],
         "-t", str(duration),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p", "-r", "30",
         "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        "-movflags", "+faststart",
         str(out_file),
     ]
 
@@ -1108,7 +1140,10 @@ def concat_segments(
         "-f", "concat",
         "-safe", "0",
         "-i", list_file.name,
-        "-c", "copy",
+        "-c:v", "copy",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        "-avoid_negative_ts", "make_zero",
+        "-movflags", "+faststart",
         str(out_file.name),
     ]
 
@@ -1138,8 +1173,18 @@ def add_bgm(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not bgm:
-        import shutil
-        shutil.copyfile(joined_path, output_path)
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(joined_path),
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+        res = run_subprocess_with_cancel(cmd, cancel_flag=cancel_flag)
+        if res.returncode != 0:
+            import shutil
+            shutil.copyfile(joined_path, output_path)
         return output_path
 
     bgm_path = Path(bgm).resolve()
@@ -1161,6 +1206,8 @@ def add_bgm(
         "-map", "[aout]",
         "-c:v", "copy",
         "-c:a", "aac", "-ar", "44100", "-ac", "2",
+        "-avoid_negative_ts", "make_zero",
+        "-movflags", "+faststart",
         "-t", str(video_duration),
         str(output_path),
     ]
@@ -1179,6 +1226,8 @@ def add_bgm(
             "-map", "[aout]",
             "-c:v", "copy",
             "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            "-avoid_negative_ts", "make_zero",
+            "-movflags", "+faststart",
             "-t", str(video_duration),
             str(output_path),
         ]

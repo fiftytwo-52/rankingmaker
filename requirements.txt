@@ -3,3 +3,4 @@ uvicorn[standard]
 python-multipart
 pydantic
 yt-dlp
+curl-cffi

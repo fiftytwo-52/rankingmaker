@@ -84,13 +84,24 @@ def get_job_endpoint(id: str):
     return job.to_dict()
 
 
-@app.get("/api/jobs/{id}/download")
+@app.api_route("/api/jobs/{id}/video", methods=["GET", "HEAD"])
+def stream_job_output(id: str):
+    job = job_manager.get_job(id)
+    output_path = Path(job.output_file) if (job and job.output_file) else BASE_DIR / "jobs" / id / "output.mp4"
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Video not found or output not ready")
+
+    return FileResponse(
+        path=output_path,
+        media_type="video/mp4",
+        headers={"Content-Disposition": "inline", "Accept-Ranges": "bytes"},
+    )
+
+
+@app.api_route("/api/jobs/{id}/download", methods=["GET", "HEAD"])
 def download_job_output(id: str):
     job = job_manager.get_job(id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    output_path = Path(job.output_file) if job.output_file else BASE_DIR / "jobs" / id / "output.mp4"
+    output_path = Path(job.output_file) if (job and job.output_file) else BASE_DIR / "jobs" / id / "output.mp4"
     if not output_path.is_file():
         raise HTTPException(status_code=404, detail="Output file not found or not ready")
 
@@ -130,6 +141,7 @@ def download_source_endpoint(req: DownloadRequest):
             "url": rel_url,
         }
     except Exception as e:
+        logger.error(f"Download error for '{url}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
