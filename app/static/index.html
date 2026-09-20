@@ -43,6 +43,8 @@
     <aside class="settings-sidebar">
       <form id="video-form" onsubmit="return false;">
         <div class="settings-sidebar-grid">
+        <!-- Column 1: Title & Typography, then Timed Elements -->
+        <div class="settings-column">
         <!-- Group 1: Title & Typography -->
         <div class="accordion-group open" id="group-title">
           <div class="accordion-header" onclick="toggleAccordion('group-title')">
@@ -124,6 +126,44 @@
           </div>
         </div>
 
+        <!-- Timed Elements (Text, Stickers & Emojis) -->
+        <div class="accordion-group open" id="group-elements">
+          <div class="accordion-header" onclick="toggleAccordion('group-elements')">
+            <span class="accordion-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+              Add Elements (Text, Stickers &amp; Emojis)
+            </span>
+            <svg class="accordion-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="accordion-body">
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+              <button type="button" id="btn-add-element-text" class="btn-ghost-sm" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);" title="Add timed text title or callout">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                <span>+ Text</span>
+              </button>
+              <button type="button" id="btn-add-element-sticker" class="btn-ghost-sm" style="color: #ec4899; border-color: rgba(236, 72, 153, 0.4);" title="Browse Stickers, Emojis &amp; Vecteezy Stock">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12 8 15 11 10 16 7 13 12 8"/></svg>
+                <span>+ Sticker / Stock</span>
+              </button>
+              <button type="button" id="btn-add-element-upload" class="btn-ghost-sm" title="Upload custom PNG sticker or graphic">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>+ Upload PNG</span>
+              </button>
+              <input type="file" id="file-element-upload" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" style="display: none;">
+            </div>
+
+            <!-- Elements list container -->
+            <div id="elements-list-container" class="elements-list-container">
+              <div id="elements-empty-state" class="elements-empty-state">
+                No timed elements yet. Click <strong>+ Text</strong> or <strong>+ Sticker / Stock</strong> to add timed graphics from one timepoint to another.
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- Column 2: Format & Framing, then Media Assets & Audio -->
+        <div class="settings-column">
         <!-- Group 2: Format & Video Framing -->
         <div class="accordion-group open" id="group-format">
           <div class="accordion-header" onclick="toggleAccordion('group-format')">
@@ -267,6 +307,55 @@
           </div>
         </div>
 
+        <!-- Media Assets & Audio -->
+        <div class="accordion-group" id="group-media">
+          <div class="accordion-header" onclick="toggleAccordion('group-media')">
+            <span class="accordion-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              Media Assets &amp; Audio
+            </span>
+            <svg class="accordion-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="accordion-body">
+            <!-- Background Image -->
+            <div class="asset-row">
+              <div class="asset-info">
+                <span class="asset-title">Background Visual</span>
+                <span id="bg-image-filename" class="asset-status">Solid background active</span>
+                <input type="hidden" id="bg-image-id">
+              </div>
+              <input type="file" id="bg-image-file" accept="image/*" style="display: none;">
+              <button type="button" id="btn-upload-bg-image" class="btn-ghost-sm">Upload Image</button>
+            </div>
+
+            <!-- Background Music -->
+            <div class="asset-row">
+              <div class="asset-info">
+                <span class="asset-title">Background Music (BGM)</span>
+                <span id="bgm-filename" class="asset-status">No music selected</span>
+                <input type="hidden" id="bgm-id">
+              </div>
+              <input type="file" id="bgm-file" accept="audio/*" style="display: none;">
+              <button type="button" id="btn-upload-bgm" class="btn-ghost-sm">Upload Audio</button>
+            </div>
+
+            <!-- Volume Controls -->
+            <div class="input-grid-2" style="margin-top: 6px;">
+              <div class="form-group">
+                <label for="bgm-volume">BGM Volume</label>
+                <input type="number" id="bgm-volume" value="0.25" min="0" max="2" step="0.05">
+              </div>
+              <div class="form-group">
+                <label for="clip-volume">Clip Volume</label>
+                <input type="number" id="clip-volume" value="1.0" min="0" max="2" step="0.1">
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- Column 3: Color Grading, then Item Deck Settings -->
+        <div class="settings-column">
         <!-- Group: Color Grading & Anti-Copyright Effects -->
         <div class="accordion-group" id="group-color">
           <div class="accordion-header" onclick="toggleAccordion('group-color')">
@@ -330,93 +419,12 @@
           </div>
         </div>
 
-        <!-- Group 3: Visuals & Audio -->
-        <div class="accordion-group" id="group-media">
-          <div class="accordion-header" onclick="toggleAccordion('group-media')">
-            <span class="accordion-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-              Media Assets &amp; Audio
-            </span>
-            <svg class="accordion-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-          <div class="accordion-body">
-            <!-- Background Image -->
-            <div class="asset-row">
-              <div class="asset-info">
-                <span class="asset-title">Background Visual</span>
-                <span id="bg-image-filename" class="asset-status">Solid background active</span>
-                <input type="hidden" id="bg-image-id">
-              </div>
-              <input type="file" id="bg-image-file" accept="image/*" style="display: none;">
-              <button type="button" id="btn-upload-bg-image" class="btn-ghost-sm">Upload Image</button>
-            </div>
-
-            <!-- Background Music -->
-            <div class="asset-row">
-              <div class="asset-info">
-                <span class="asset-title">Background Music (BGM)</span>
-                <span id="bgm-filename" class="asset-status">No music selected</span>
-                <input type="hidden" id="bgm-id">
-              </div>
-              <input type="file" id="bgm-file" accept="audio/*" style="display: none;">
-              <button type="button" id="btn-upload-bgm" class="btn-ghost-sm">Upload Audio</button>
-            </div>
-
-            <!-- Volume Controls -->
-            <div class="input-grid-2" style="margin-top: 6px;">
-              <div class="form-group">
-                <label for="bgm-volume">BGM Volume</label>
-                <input type="number" id="bgm-volume" value="0.25" min="0" max="2" step="0.05">
-              </div>
-              <div class="form-group">
-                <label for="clip-volume">Clip Volume</label>
-                <input type="number" id="clip-volume" value="1.0" min="0" max="2" step="0.1">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Group: Timed Elements (Stickers, Text & Emojis) -->
-        <div class="accordion-group open" id="group-elements">
-          <div class="accordion-header" onclick="toggleAccordion('group-elements')">
-            <span class="accordion-title">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-              Add Elements (Text, Stickers &amp; Emojis)
-            </span>
-            <svg class="accordion-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-          <div class="accordion-body">
-            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
-              <button type="button" id="btn-add-element-text" class="btn-ghost-sm" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);" title="Add timed text title or callout">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                <span>+ Text</span>
-              </button>
-              <button type="button" id="btn-add-element-sticker" class="btn-ghost-sm" style="color: #ec4899; border-color: rgba(236, 72, 153, 0.4);" title="Browse Stickers, Emojis &amp; Vecteezy Stock">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12 8 15 11 10 16 7 13 12 8"/></svg>
-                <span>+ Sticker / Stock</span>
-              </button>
-              <button type="button" id="btn-add-element-upload" class="btn-ghost-sm" title="Upload custom PNG sticker or graphic">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span>+ Upload PNG</span>
-              </button>
-              <input type="file" id="file-element-upload" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" style="display: none;">
-            </div>
-
-            <!-- Elements list container -->
-            <div id="elements-list-container" class="elements-list-container">
-              <div id="elements-empty-state" class="elements-empty-state">
-                No timed elements yet. Click <strong>+ Text</strong> or <strong>+ Sticker / Stock</strong> to add timed graphics from one timepoint to another.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Group 5: Clip Deck Defaults — fills 3rd col gap in 3-col layout -->
+        <!-- Group: Item Deck Settings (defaults applied to newly added clips) -->
         <div class="accordion-group open" id="group-deck-defaults">
           <div class="accordion-header" onclick="toggleAccordion('group-deck-defaults')">
             <span class="accordion-title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/></svg>
-              Clip Deck Defaults
+              Item Deck Settings
             </span>
             <svg class="accordion-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
@@ -482,6 +490,7 @@
               </label>
             </div>
           </div>
+        </div>
         </div>
 
         <!-- Group 6: Ranked Countdown Items Deck — spans full width -->

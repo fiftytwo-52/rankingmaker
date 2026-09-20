@@ -224,12 +224,24 @@ body {
   width: 100%;
 }
 
+/* A vertical stack of panels — becomes its own tight column on wide layouts */
+.settings-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
 @container (min-width: 660px) {
   .settings-sidebar-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--spacing-sm);
     align-items: start;
+  }
+  /* 2-col: flatten the stacks so panels pack row-by-row by grid flow */
+  .settings-column {
+    display: contents;
   }
   /* span-full always takes full width */
   .settings-sidebar-grid .span-full {
@@ -240,6 +252,14 @@ body {
 @container (min-width: 1060px) {
   .settings-sidebar-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--spacing-sm);
+  }
+  /* 3-col: each stack is its own tight column. A short panel (e.g. a collapsed
+     Color Grading) no longer leaves a hole in a shared row — the next panel in
+     the same stack sits directly beneath it. */
+  .settings-column {
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-sm);
   }
   /* on 3-col: items deck still spans all 3 cols */
